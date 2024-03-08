@@ -1,7 +1,7 @@
 # PACER+: On-Demand Pedestrian Animation Controller in Driving Scenarios
 Official implementation of the paper "PACER+: On-Demand Pedestrian Animation Controller in Driving Scenarios" (CVPR 2024). 
     
-    We address the challenge of content diversity and controllability in pedestrian simulation for driving scenarios. The fundamental contribution of our framework lies in combining the motion tracking task with trajectory following, which enables the tracking of specific motion parts (eg., upper body) while simultaneously following the given trajectory by a single policy. This way, we enhance both the diversity of simulated human motion within the given scenario and the controllability of the content, including language-based control. Our framework facilitates the generation of a wide range of human motions, contributing to greater realism and adaptability in pedestrian simulations for driving scenarios.
+We address the challenge of content diversity and controllability in pedestrian simulation for driving scenarios. The fundamental contribution of our framework lies in combining the motion tracking task with trajectory following, which enables the tracking of specific motion parts (eg., upper body) while simultaneously following the given trajectory by a single policy. This way, we enhance both the diversity of simulated human motion within the given scenario and the controllability of the content, including language-based control. Our framework facilitates the generation of a wide range of human motions, contributing to greater realism and adaptability in pedestrian simulations for driving scenarios.
 
 <div float="center">
   <img src="assets/teaser.gif" />
