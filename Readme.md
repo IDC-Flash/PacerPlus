@@ -63,6 +63,8 @@ pip install -r requirement.txt
             | -- amass_isaac_im_train_take6_upright_slim.pkl
 
 ```
+5. City Environment: We have an example environment for the virtual city environment. This environment is built on top of the [Matrix City](https://city-super.github.io/matrixcity/). You can download the environment from [here](https://drive.google.com/file/d/1koj-EqLrnivLVwmuRFydWZQgUGavmWYS/view?usp=drive_link).
+
 # Training
 We train our policy on a single A100 GPU. We do not use Residual Force Control (RFC) and Residual PD for this work. We test our code on A100, RTX 3090 and RTX 4090. The training time is almost 3 days for our experiments.
 
