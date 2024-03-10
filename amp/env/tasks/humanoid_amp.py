@@ -21,7 +21,7 @@ from typing import Dict, Optional
 from isaacgym import gymapi
 from isaacgym import gymtorch
 
-from env.tasks.humanoid import Humanoid, dof_to_obs, remove_base_rot, dof_to_obs_smpl
+from env.tasks.humanoid import Humanoid, dof_to_obs, remove_base_rot, dof_to_obs_smpl, get_euler_xyz
 from env.util import gym_util
 from amp.utils.motion_lib import MotionLib
 from amp.utils.motion_lib_smpl import MotionLib as MotionLibSMPL
@@ -42,6 +42,8 @@ HACK_MOTION_SYNC = False
 HACK_CONSISTENCY_TEST = False
 HACK_OUTPUT_MOTION = False
 HACK_OUTPUT_MOTION_ALL = False
+SMPL_TO_H1 = [1, 2, 3, 5, 6, 7, 9, 15, 16, 17, 20, 21, 22]
+
 
 
 class HumanoidAMP(Humanoid):
@@ -69,11 +71,7 @@ class HumanoidAMP(Humanoid):
         self._temporal_output = cfg['env'].get("temporalOutput", False)
         self._temporal_buf_length = cfg['env'].get("temporalBufLength", 1)
         self.use_temporal_buf = self._temporal_buf_length > 1
-        self.phase_reconstruction_loss = cfg['env'].get("phaseReconstructionLoss", False)
-        self.amp_smpl_keypoint_obs = cfg['env'].get("ampSMPLKeypointObs", False)
-        self.amp_key_body_dof_obs = cfg['env'].get("ampKeyBodyDofObs", False)
-        self.amp_key_bodies = self.cfg["env"]["ampKeyBodies"] if "ampKeyBodies" in self.cfg["env"] else self.cfg["env"]["keyBodies"]
-        self._amp_key_body_ids = self._build_key_body_ids_tensor(self.amp_key_bodies)
+
 
         assert (self._num_amp_obs_steps >= 2)
 
@@ -127,35 +125,13 @@ class HumanoidAMP(Humanoid):
         self._hist_amp_obs_buf = self._amp_obs_buf[:, 1:]
 
         self._amp_obs_demo_buf = None
-
-        data_dir = "data/smpl"
-        self.smpl_parser_n = SMPL_Parser(model_path=data_dir,
-                                         gender="neutral").to(self.device)
-        self.smpl_parser_m = SMPL_Parser(model_path=data_dir,
-                                         gender="male").to(self.device)
-        self.smpl_parser_f = SMPL_Parser(model_path=data_dir,
-                                         gender="female").to(self.device)
-
         self.start = True # camera flag
         self.ref_motion_cache = {}
         return
 
     def resample_motions(self):
-        # self.gym.destroy_sim(self.sim)
-        # del self.sim
-        # if not self.headless:
-        #     self.gym.destroy_viewer(self.viewer)
-        # self.create_sim()
-        # self.gym.prepare_sim(self.sim)
-        # self.create_viewer()
-        # self._setup_tensors()
         print("Partial solution, only resample motions...")
         self._motion_lib.load_motions(skeleton_trees = self.skeleton_trees, limb_weights = self.humanoid_limb_and_weights.cpu(), gender_betas = self.humanoid_betas.cpu()) # For now, only need to sample motions since there are only 400 hmanoids
-        # self.reset()
-        # torch.cuda.empty_cache()
-        # gc.collect()
-
-
 
 
     def register_obs_hist(self, env_ids, obs):
@@ -422,83 +398,41 @@ class HumanoidAMP(Humanoid):
     def _sample_time(self, motion_ids):
         return self._motion_lib.sample_time(motion_ids)
 
-    def _get_fixed_smpl_state_from_motionlib(self, motion_ids, motion_times, curr_gender_betas):
-        # Used for intialization. Not used for sampling. Only used for AMP, not imitation.
-        motion_res = self._get_smpl_state_from_motionlib_cache(motion_ids, motion_times)
-        root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, _, pose_aa, rb_pos, rb_rot, body_vel, body_ang_vel = \
-                motion_res["root_pos"], motion_res["root_rot"], motion_res["dof_pos"], motion_res["root_vel"], motion_res["root_ang_vel"], motion_res["dof_vel"], \
-                motion_res["key_pos"], motion_res["motion_bodies"], motion_res["motion_aa"], motion_res["rg_pos"], motion_res["rb_rot"], motion_res["body_vel"], motion_res["body_ang_vel"]
-
-        with torch.no_grad():
-            gender = curr_gender_betas[:, 0]
-            betas = curr_gender_betas[:, 1:]
-            B, _ = betas.shape
-
-            genders_curr = gender == 2
-            height_tolorance = 0.02
-            if genders_curr.sum() > 0:
-                poses_curr = pose_aa[genders_curr]
-                root_pos_curr = root_pos[genders_curr]
-                betas_curr = betas[genders_curr]
-                vertices_curr, joints_curr = self.smpl_parser_f.get_joints_verts(
-                    poses_curr, betas_curr, root_pos_curr)
-                offset = joints_curr[:, 0] - root_pos[genders_curr]
-                diff_fix = ((vertices_curr - offset[:, None])[..., -1].min(dim=-1).values - height_tolorance)
-                root_pos[genders_curr, ..., -1] -= diff_fix
-                key_pos[genders_curr, ..., -1] -= diff_fix[:, None]
-                rb_pos[genders_curr, ..., -1] -= diff_fix[:, None]
-
-            genders_curr = gender == 1
-            if genders_curr.sum() > 0:
-                poses_curr = pose_aa[genders_curr]
-                root_pos_curr = root_pos[genders_curr]
-                betas_curr = betas[genders_curr]
-                vertices_curr, joints_curr = self.smpl_parser_m.get_joints_verts(
-                    poses_curr, betas_curr, root_pos_curr)
-
-                offset = joints_curr[:, 0] - root_pos[genders_curr]
-                diff_fix = (
-                    (vertices_curr - offset[:, None])[..., -1].min(dim=-1).values -
-                    height_tolorance)
-                root_pos[genders_curr, ..., -1] -= diff_fix
-                key_pos[genders_curr, ..., -1] -= diff_fix[:, None]
-                rb_pos[genders_curr, ..., -1] -= diff_fix[:, None]
-
-            genders_curr = gender == 0
-            if genders_curr.sum() > 0:
-                poses_curr = pose_aa[genders_curr]
-                root_pos_curr = root_pos[genders_curr]
-                betas_curr = betas[genders_curr]
-                vertices_curr, joints_curr = self.smpl_parser_n.get_joints_verts(
-                    poses_curr, betas_curr, root_pos_curr)
-
-                offset = joints_curr[:, 0] - root_pos[genders_curr]
-                diff_fix = (
-                    (vertices_curr - offset[:, None])[..., -1].min(dim=-1).values -
-                    height_tolorance)
-                root_pos[genders_curr, ..., -1] -= diff_fix
-                key_pos[genders_curr, ..., -1] -= diff_fix[:, None]
-                rb_pos[genders_curr, ..., -1] -= diff_fix[:, None]
-
-            return root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot, body_vel, body_ang_vel
-
     def _get_smpl_state_from_motionlib_cache(self, motion_ids, motion_times):
-        ## Chace the motion
-        if not "motion_ids" in self.ref_motion_cache:
-            self.ref_motion_cache['motion_ids'] = motion_ids
-            self.ref_motion_cache['motion_times'] = motion_times
-        else:
-            if len(self.ref_motion_cache['motion_ids']) != len(motion_ids) or  (self.ref_motion_cache['motion_ids'] - motion_ids).abs().sum() + \
-                    (self.ref_motion_cache['motion_times'] - motion_times).abs().sum() > 0:
-                self.ref_motion_cache['motion_ids'] = motion_ids
-                self.ref_motion_cache['motion_times'] = motion_times
-            else:
-                return self.ref_motion_cache
         motion_res = self._motion_lib.get_motion_state_smpl(motion_ids, motion_times)
 
-        self.ref_motion_cache.update(motion_res)
+        ######## change smpl dof to h1
+        dof_pos = motion_res["dof_pos"]
+        dof_vel = motion_res["dof_vel"]
 
-        return self.ref_motion_cache
+        dof_pos = dof_pos.reshape(-1, 23, 3)[:, SMPL_TO_H1, :]
+        dof_vel = dof_vel.reshape(-1, 23, 3)[:, SMPL_TO_H1, :]
+
+        dof_pos = get_euler_xyz(dof_pos)
+        dof_pos = torch.cat(( dof_pos[:, 0, [2, 0, 1]], dof_pos[:, 1, 1:2], dof_pos[:, 2, 1:2],
+                              dof_pos[:, 3, [2, 0, 1]], dof_pos[:, 4, 1:2], dof_pos[:, 5, 1:2], 
+                              dof_pos[:, 6, 1:2],
+                              dof_pos[:, 7, [1, 0, 2]], dof_pos[:, 8, 1:2], dof_pos[:, 9, 1:2],
+                              dof_pos[:, 10, [1, 0, 2]], dof_pos[:, 11, 1:2], dof_pos[:, 12, 1:2],
+                              ), dim=-1)
+        
+        dof_pos[:, 13] += 90 / 180 * np.pi
+        dof_pos[:, 14] += 90 / 180 * np.pi
+        dof_pos[:, 17] -= 90 / 180 * np.pi
+        dof_pos[:, 18] -= 90 / 180 * np.pi
+
+
+        dof_vel = get_euler_xyz(dof_vel)[..., [2, 0, 1]]
+        dof_vel = torch.cat(( dof_vel[:, 0, [2, 0, 1]], dof_vel[:, 1, 1:2], dof_vel[:, 2, 1:2],
+                              dof_vel[:, 3, [2, 0, 1]], dof_vel[:, 4, 1:2], dof_vel[:, 5, 1:2], 
+                              dof_vel[:, 6, 1:2],
+                              dof_vel[:, 7, [1, 0, 2]], dof_vel[:, 8, 1:2], dof_vel[:, 9, 1:2],
+                              dof_vel[:, 10, [1, 0, 2]], dof_vel[:, 11, 1:2], dof_vel[:, 12, 1:2],
+                              ), dim=-1)        
+        motion_res["dof_pos"] = dof_pos
+        motion_res["dof_vel"] = dof_vel
+        
+        return motion_res
 
     def _sample_ref_state(self, env_ids):
         num_envs = env_ids.shape[0]
@@ -875,148 +809,7 @@ class HumanoidAMP(Humanoid):
         # ipdb.set_trace()
         return
 
-    def _update_camera(self):
-        self.gym.refresh_actor_root_state_tensor(self.sim)
-        char_root_pos = self._humanoid_root_states[self.viewing_env_idx,
-                                                   0:3].cpu().numpy()
 
-        cam_trans = self.gym.get_viewer_camera_transform(self.viewer, None)
-        cam_pos = np.array([cam_trans.p.x, cam_trans.p.y, cam_trans.p.z])
-        cam_delta = cam_pos - self._cam_prev_char_pos
-
-        new_cam_target = gymapi.Vec3(char_root_pos[0], char_root_pos[1], char_root_pos[2])
-        # if np.abs(cam_pos[2] - char_root_pos[2]) > 5:
-        cam_pos[2] = char_root_pos[2] + 0.5
-        new_cam_pos = gymapi.Vec3(char_root_pos[0] + cam_delta[0], char_root_pos[1] + cam_delta[1], cam_pos[2])
-
-        self.gym.set_camera_location(self.recorder_camera_handle, self.envs[self.viewing_env_idx],
-                                     new_cam_pos, new_cam_target)
-
-        if flags.follow:
-            self.start = True
-        else:
-            self.start = False
-
-        if self.start:
-            self.gym.viewer_camera_look_at(self.viewer, None, new_cam_pos, new_cam_target)
-
-        self._cam_prev_char_pos[:] = char_root_pos
-        return
-
-
-    def _hack_consistency_test(self):
-        if (not hasattr(self, "_hack_motion_time")):
-            self._hack_motion_time = 0.0
-
-        motion_ids = np.array([0] * self.num_envs, dtype=np.int)
-        motion_times = np.array([self._hack_motion_time] * self.num_envs)
-        root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos \
-           = self._motion_lib.get_motion_state(motion_ids, motion_times)
-
-        env_ids = torch.arange(self.num_envs,
-                               dtype=torch.long,
-                               device=self.device)
-        self._set_env_state(env_ids=env_ids,
-                            root_pos=root_pos,
-                            root_rot=root_rot,
-                            dof_pos=dof_pos,
-                            root_vel=root_vel,
-                            root_ang_vel=root_ang_vel,
-                            dof_vel=dof_vel)
-
-        self._reset_env_tensors(env_ids)
-
-        motion_dur = self._motion_lib._motion_lengths[0]
-        self._hack_motion_time = np.fmod(self._hack_motion_time + self.dt,
-                                         motion_dur)
-
-        self._refresh_sim_tensors()
-
-        sim_key_body_pos = self._rigid_body_pos[:, self._key_body_ids, :]
-        if self.smpl_humanoid:
-            print("ZL NOT FIXED YET")
-            sim_amp_obs = build_amp_observations_smpl(
-                self._rigid_body_pos[:, 0, :], self._rigid_body_rot[:, 0, :],
-                self._rigid_body_vel[:, 0, :], self._rigid_body_ang_vel[:,
-                                                                        0, :],
-                self._dof_pos, self._dof_vel, sim_key_body_pos,
-                self._local_root_obs, self._root_height_obs, self._dof_offsets)
-
-            ref_amp_obs = build_amp_observations_smpl(
-                root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel,
-                key_pos, self._local_root_obs, self._root_height_obs,
-                self._dof_offsets)
-        else:
-            sim_amp_obs = build_amp_observations(
-                self._rigid_body_pos[:, 0, :], self._rigid_body_rot[:, 0, :],
-                self._rigid_body_vel[:, 0, :],
-                self._rigid_body_ang_vel[:, 0, :], self._dof_pos,
-                self._dof_vel, sim_key_body_pos, self._local_root_obs,
-                self._root_height_obs, self._dof_obs_size, self._dof_offsets)
-
-            ref_amp_obs = build_amp_observations(
-                root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel,
-                key_pos, self._local_root_obs, self._root_height_obs,
-                self._dof_obs_size, self._dof_offsets)
-
-        obs_diff = sim_amp_obs - ref_amp_obs
-        obs_diff = torch.abs(obs_diff)
-        obs_err = torch.max(obs_diff, dim=0)
-
-        return
-
-    def _hack_output_motion(self):
-        fps = 1.0 / self.dt
-        from poselib.poselib.skeleton.skeleton3d import SkeletonMotion, SkeletonState
-        from poselib.poselib.visualization.common import plot_skeleton_motion_interactive
-
-        if (not hasattr(self, '_output_motion_root_pos')):
-            self._output_motion_root_pos = []
-            self._output_motion_global_rot = []
-
-        root_pos = self._humanoid_root_states[..., 0:3].cpu().numpy()
-        self._output_motion_root_pos.append(root_pos)
-
-        body_rot = self._rigid_body_rot.cpu().numpy()
-        rot_mask = body_rot[..., -1] < 0
-        body_rot[rot_mask] = -body_rot[rot_mask]
-        self._output_motion_global_rot.append(body_rot)
-
-        reset = self.reset_buf[0].cpu().numpy() == 1
-
-        if (reset and len(self._output_motion_root_pos) > 1):
-            output_root_pos = np.array(self._output_motion_root_pos)
-            output_body_rot = np.array(self._output_motion_global_rot)
-            output_root_pos = to_torch(output_root_pos, device='cpu')
-            output_body_rot = to_torch(output_body_rot, device='cpu')
-
-            skeleton_tree = self._motion_lib._motions[0].skeleton_tree
-
-            if (HACK_OUTPUT_MOTION_ALL):
-                num_envs = self.num_envs
-            else:
-                num_envs = 1
-
-            for i in range(num_envs):
-                curr_body_rot = output_body_rot[:, i, :]
-                curr_root_pos = output_root_pos[:, i, :]
-                sk_state = SkeletonState.from_rotation_and_root_translation(
-                    skeleton_tree,
-                    curr_body_rot,
-                    curr_root_pos,
-                    is_local=False)
-                sk_motion = SkeletonMotion.from_skeleton_state(sk_state,
-                                                               fps=fps)
-
-                output_file = 'output/record_char_motion{:04d}.npy'.format(i)
-                sk_motion.to_file(output_file)
-
-                #plot_skeleton_motion_interactive(sk_motion)
-
-            self._output_motion_root_pos = []
-            self._output_motion_global_rot = []
-
-        return
 
 
 #####################################################################

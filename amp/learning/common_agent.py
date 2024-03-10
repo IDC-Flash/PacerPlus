@@ -23,7 +23,7 @@ from rl_games.common import vecenv
 
 import torch
 from torch import optim
-
+from torch import nn
 import learning.amp_datasets as amp_datasets
 
 from tensorboardX import SummaryWriter
@@ -45,10 +45,6 @@ class CommonAgent(a2c_continuous.A2CAgent):
         net_config = self._build_net_config()
         if self.normalize_input:
             obs_shape = torch_ext.shape_whc_to_cwh(self.obs_shape)
-            if self.task.use_temporal_buf:
-                obs_shape = (obs_shape[0] - self.task._temporal_buf_length * self.task.get_self_obs_size())
-            if self.task._temporal_output:
-                obs_shape = (obs_shape[0] // self.task._temporal_hist_length, self.task._temporal_hist_length)
             self.running_mean_std = RunningMeanStd(obs_shape).to(self.ppo_device)
         net_config['mean_std'] = self.running_mean_std
         self.model = self.network.build(net_config)
@@ -557,18 +553,8 @@ class CommonAgent(a2c_continuous.A2CAgent):
             if obs_batch.dtype == torch.uint8:
                 obs_batch = obs_batch.float() / 255.0
         if self.normalize_input:
-            ######## process the output part
-            if self.task.use_temporal_buf:
-                temporal_buf_length = self.task._temporal_buf_length
-                temporal_buf_size = self.vec_env.env.task.get_self_obs_size()
-                obs_batch, temporal_buffer = obs_batch[:, :-temporal_buf_size * temporal_buf_length], obs_batch[:, -temporal_buf_size * temporal_buf_length:]
-
-            if self.task._temporal_output:
-               obs_batch = obs_batch.reshape(-1, obs_batch.shape[1] // self.task._temporal_hist_length, self.task._temporal_hist_length) 
             obs_batch = self.running_mean_std(obs_batch)
             obs_batch = obs_batch.reshape(obs_batch.shape[0], -1)
-            if self.task.use_temporal_buf:
-                obs_batch = torch.cat([obs_batch, temporal_buffer], dim=1)
         
         return obs_batch
 

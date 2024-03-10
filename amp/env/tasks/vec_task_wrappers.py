@@ -24,8 +24,8 @@ class VecTaskGPUWrapper(VecTaskGPU):
 class VecTaskPythonWrapper(VecTaskPython):
     def __init__(self, task, rl_device, clip_observations=5.0, clip_actions=1.0):
         super().__init__(task, rl_device, clip_observations, clip_actions)
-
-        self._amp_obs_space = spaces.Box(np.ones(task.get_num_amp_obs()) * -np.Inf, np.ones(task.get_num_amp_obs()) * np.Inf)
+        if hasattr(task, 'get_num_amp_obs'):
+            self._amp_obs_space = spaces.Box(np.ones(task.get_num_amp_obs()) * -np.Inf, np.ones(task.get_num_amp_obs()) * np.Inf)
         return
 
     def reset(self, env_ids=None):

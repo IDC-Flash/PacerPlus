@@ -28,6 +28,11 @@ import copy
 import torch
 import wandb
 
+from learning import common_agent
+from learning import common_player
+from learning import common_models
+from learning import common_network_builder
+
 from learning import amp_continuous
 from learning import amp_continuous_value
 from learning import amp_players
@@ -123,9 +128,9 @@ class RLGPUEnv(vecenv.IVecEnv):
     def get_env_info(self):
         info = {}
         info['action_space'] = self.env.action_space
-        print('Use Temporal Observation: ', self.env.task._temporal_output)
         info['observation_space'] = self.env.observation_space
-        info['amp_observation_space'] = self.env.amp_observation_space
+        if hasattr(self.env, 'amp_observation_space'):
+            info['amp_observation_space'] = self.env.amp_observation_space
 
         if self.use_global_obs:
             info['state_space'] = self.env.state_space
@@ -143,6 +148,9 @@ env_configurations.register('rlgpu', {
 
 def build_alg_runner(algo_observer):
     runner = Runner(algo_observer)
+    runner.algo_factory.register_builder('common', lambda **kwargs : common_agent.CommonAgent(**kwargs))
+    runner.player_factory.register_builder('common', lambda **kwargs : common_player.CommonPlayer(**kwargs))
+
     runner.algo_factory.register_builder('amp_continuous', lambda **kwargs : amp_continuous.AMPAgent(**kwargs))
     runner.player_factory.register_builder('amp_continuous', lambda **kwargs : amp_players.AMPPlayerContinuous(**kwargs))
 
@@ -150,6 +158,9 @@ def build_alg_runner(algo_observer):
     runner.player_factory.register_builder(
         'amp_continuous_value',
         lambda **kwargs: amp_value_players.AMPPlayerContinuousValue(**kwargs))
+
+    runner.model_builder.model_factory.register_builder('common', lambda network, **kwargs : common_models.ModelCommonContinuous(network))
+    runner.model_builder.network_factory.register_builder('common', lambda **kwargs : common_network_builder.CommonBuilder())
 
     runner.model_builder.model_factory.register_builder('continuous_amp', lambda network, **kwargs : amp_models.ModelAMPContinuous(network))
     runner.model_builder.network_factory.register_builder('amp', lambda **kwargs : amp_network_builder.AMPBuilder())
