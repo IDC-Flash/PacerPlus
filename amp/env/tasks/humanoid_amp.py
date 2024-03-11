@@ -132,7 +132,7 @@ class HumanoidAMP(Humanoid):
 
     def resample_motions(self):
         print("Partial solution, only resample motions...")
-        self._motion_lib.load_motions(skeleton_trees = self.skeleton_trees, limb_weights = self.humanoid_limb_and_weights.cpu(), gender_betas = self.humanoid_betas.cpu()) # For now, only need to sample motions since there are only 400 hmanoids
+        self._motion_lib.load_motions(skeleton_trees = self.skeleton_trees, limb_weights = torch.zeros([self.num_envs, 10]).float(), gender_betas = torch.zeros([self.num_envs, 11]).float()) # For now, only need to sample motions since there are only 400 hmanoids
 
 
     def register_obs_hist(self, env_ids, obs):
@@ -281,8 +281,8 @@ class HumanoidAMP(Humanoid):
         smpl_asset_path = os.getcwd()
         smpl_asset_file = 'amp/data/assets/mjcf/smpl_humanoid.xml'
         sk_tree = SkeletonTree.from_mjcf(os.path.join(smpl_asset_path, smpl_asset_file))
-        skeleton_trees = [sk_tree] * self.num_envs
-        self._motion_lib.load_motions(skeleton_trees = skeleton_trees, gender_betas = torch.zeros([self.num_envs, 11]).float(),
+        self.skeleton_trees = [sk_tree] * self.num_envs
+        self._motion_lib.load_motions(skeleton_trees = self.skeleton_trees, gender_betas = torch.zeros([self.num_envs, 11]).float(),
                                        limb_weights = torch.zeros([self.num_envs, 10]).float(), random_sample=not HACK_MOTION_SYNC)
 
 
@@ -348,29 +348,29 @@ class HumanoidAMP(Humanoid):
         B, N = dof_pos.shape[:2]
         dof_pos = dof_pos.reshape(B*N, 4)
         dof_pos = get_euler_xyz(dof_pos)
-        dof_pos = (dof_pos.reshape(B, N, 3)) / (np.pi / 2)
+        dof_pos = (dof_pos.reshape(B, N, 3)) 
 
-        dof_pos = torch.cat(( dof_pos[:, 0, [2, 0, 1]], dof_pos[:, 1, 1:2], dof_pos[:, 2, 1:2],
-                              dof_pos[:, 3, [2, 0, 1]], dof_pos[:, 4, 1:2], dof_pos[:, 5, 1:2], 
-                              dof_pos[:, 6, 1:2],
-                              dof_pos[:, 7, [1, 0, 2]], dof_pos[:, 8, 1:2],
-                              dof_pos[:, 9,[1, 0, 2]], dof_pos[:, 10, 1:2],
+        dof_pos = torch.cat(( dof_pos[:, 0, [2, 0, 1]], dof_pos[:, 1, 2:3], dof_pos[:, 2, 2:3],
+                              dof_pos[:, 3, [2, 0, 1]], dof_pos[:, 4, 2:3], dof_pos[:, 5, 2:3], 
+                              dof_pos[:, 6, 2:3],
+                              dof_pos[:, 7, [1, 0, 2]], dof_pos[:, 8, 2:3],
+                              dof_pos[:, 9, [1, 0, 2]], dof_pos[:, 10, 2:3],
                               ), dim=-1)
-        
+        #dof_pos[:, 11] *= 0
         dof_pos += self.default_dof_pos
-        dof_pos[:, 12] += 90 / 360
-        dof_pos[:, 14] += 90 / 360 
-        dof_pos[:, 16] -= 90 / 360
-        dof_pos[:, 18] -= 90 / 360
+        dof_pos[:, 12] += 1 / 2
+        dof_pos[:, 14] += 1/ 2
+        dof_pos[:, 16] -= 1 / 2
+        dof_pos[:, 18] += 1 / 2
 
         dof_vel = dof_vel.reshape(B*N, 4)
         dof_vel = get_euler_xyz(dof_vel)
-        dof_vel = dof_vel.reshape(B, N, 3) / (np.pi / 2)
-        dof_vel = torch.cat(( dof_vel[:, 0, [2, 0, 1]], dof_vel[:, 1, 1:2], dof_vel[:, 2, 1:2],
-                              dof_vel[:, 3, [2, 0, 1]], dof_vel[:, 4, 1:2], dof_vel[:, 5, 1:2], 
-                              dof_vel[:, 6, 1:2],
-                              dof_vel[:, 7, [1, 0, 2]], dof_vel[:, 8, 1:2],
-                              dof_vel[:, 9,[1, 0, 2]], dof_vel[:, 10, 1:2],
+        dof_vel = dof_vel.reshape(B, N, 3) 
+        dof_vel = torch.cat(( dof_vel[:, 0, [2, 0, 1]], dof_vel[:, 1, 2:3], dof_vel[:, 2, 2:3],
+                              dof_vel[:, 3, [2, 0, 1]], dof_vel[:, 4, 2:3], dof_vel[:, 5, 2:3], 
+                              dof_vel[:, 6, 2:3],
+                              dof_vel[:, 7, [1, 0, 2]], dof_vel[:, 8, 2:3],
+                              dof_vel[:, 9,[1, 0, 2]], dof_vel[:, 10, 2:3],
                               ), dim=-1)
         #dof_pos[:, :10] += self.default_do    
         motion_res["dof_pos"] = dof_pos

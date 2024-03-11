@@ -34,13 +34,9 @@
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
         <sphere radius="0.05"/>
-      </geometry>
-    </collision>
-  </link>
-  <link
-    name="left_hip_yaw_link">
-    <inertial>
-      <origin
+            props (numpy.array): Properties of each DOF of the asset
+            env_id (int): Environment id
+
         xyz="-0.04923 0.0001 0.0072"
         rpy="0 0 0" />
       <mass
