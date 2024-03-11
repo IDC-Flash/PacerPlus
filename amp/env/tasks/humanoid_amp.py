@@ -303,18 +303,21 @@ class HumanoidAMP(Humanoid):
         return
 
     def _reset_actors(self, env_ids):
-        if (self._state_init == HumanoidAMP.StateInit.Default):
-            self._reset_default(env_ids)
-        elif (self._state_init == HumanoidAMP.StateInit.Start
-              or self._state_init == HumanoidAMP.StateInit.Random):
-            self._reset_ref_state_init(env_ids)
-        elif (self._state_init == HumanoidAMP.StateInit.Hybrid):
-            self._reset_hybrid_state_init(env_ids)
+        if flags.test:
+            super()._reset_actors(env_ids)
         else:
-            assert (
-                False
-            ), "Unsupported state initialization strategy: {:s}".format(
-                str(self._state_init))
+            if (self._state_init == HumanoidAMP.StateInit.Default):
+                self._reset_default(env_ids)
+            elif (self._state_init == HumanoidAMP.StateInit.Start
+                or self._state_init == HumanoidAMP.StateInit.Random):
+                self._reset_ref_state_init(env_ids)
+            elif (self._state_init == HumanoidAMP.StateInit.Hybrid):
+                self._reset_hybrid_state_init(env_ids)
+            else:
+                assert (
+                    False
+                ), "Unsupported state initialization strategy: {:s}".format(
+                    str(self._state_init))
         return
 
     def _reset_default(self, env_ids):

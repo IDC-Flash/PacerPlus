@@ -185,26 +185,6 @@ class Humanoid(BaseTask):
            'right_shoulder_yaw_joint' : 0.,
            'right_elbow_joint' : 0.,
         }
-
-        stiffness = {'hip_yaw': 200,
-                     'hip_roll': 200,
-                     'hip_pitch': 200,
-                     'knee': 300,
-                     'ankle': 40,
-                     'torso': 300,
-                     'shoulder': 100,
-                     "elbow":100,
-                     }  # [N*m/rad]
-        damping = {  'hip_yaw': 5,
-                     'hip_roll': 5,
-                     'hip_pitch': 5,
-                     'knee': 6,
-                     'ankle': 2,
-                     'torso': 6,
-                     'shoulder': 2,
-                     "elbow":2,
-                     }  # [N*m/rad]  # [N*m*s/rad]
-    
         # joint positions offsets and PD gains
         for i in range(self.num_dofs):
             name = self.dof_names[i]
@@ -212,10 +192,10 @@ class Humanoid(BaseTask):
             self.default_dof_pos[i] = angle
 
             found = False
-            for dof_name in stiffness.keys():
+            for dof_name in self.stiffness.keys():
                 if dof_name in name:
-                    self.p_gains[i] = stiffness[dof_name]
-                    self.d_gains[i] = damping[dof_name]
+                    self.p_gains[i] = self.stiffness[dof_name]
+                    self.d_gains[i] = self.damping[dof_name]
                     found = True
             if not found:
                 self.p_gains[i] = 0.
@@ -481,6 +461,37 @@ class Humanoid(BaseTask):
         self.num_bodies = len(body_names)
         self.num_dofs = len(self.dof_names)
 
+        stiffness = {'hip_yaw': 200,
+                     'hip_roll': 200,
+                     'hip_pitch': 200,
+                     'knee': 300,
+                     'ankle': 40,
+                     'torso': 300,
+                     'shoulder': 100,
+                     "elbow":100,
+                     }  # [N*m/rad]
+        damping = {  'hip_yaw': 5,
+                     'hip_roll': 5,
+                     'hip_pitch': 5,
+                     'knee': 6,
+                     'ankle': 2,
+                     'torso': 6,
+                     'shoulder': 2,
+                     "elbow":2,
+                     }  # [N*m/rad]  # [N*m*s/rad]
+        self.stiffness = stiffness
+        self.damping = damping
+
+        for i in range(self.num_dofs):
+            dof_props_asset['driveMode'][i] = gymapi.DOF_MODE_POS
+            # joint positions offsets and PD gains
+            name = self.dof_names[i]
+            for dof_name in self.stiffness.keys():
+                if dof_name in name:
+                    dof_props_asset['stiffness'][i] = self.stiffness[dof_name]
+                    dof_props_asset['damping'][i] = self.damping[dof_name]
+
+
         # get the names of the feet and the contact bodies  
         foot_name = 'ankle'        
         feet_names = [s for s in body_names if foot_name in s]
@@ -586,6 +597,8 @@ class Humanoid(BaseTask):
                 r = self.dof_pos_limits[i, 1] - self.dof_pos_limits[i, 0]
                 self.dof_pos_limits[i, 0] = m - 0.5 * r * 0.9
                 self.dof_pos_limits[i, 1] = m + 0.5 * r * 0.98
+            self._pd_action_offset = (self.dof_pos_limits[:, 1] + self.dof_pos_limits[:, 0]) / 2
+            self._pd_action_scale = (self.dof_pos_limits[:, 1] - self.dof_pos_limits[:, 0]) / 2
         return props
     
     def _process_rigid_body_props(self, props, env_id):
@@ -616,7 +629,7 @@ class Humanoid(BaseTask):
 
         humanoid_handle = self.gym.create_actor(env_ptr, humanoid_asset, start_pose, "h1", col_group, col_filter, 0)
         dof_prop = self._process_dof_props(dof_props_asset, env_id)
-        dof_prop["driveMode"] = gymapi.DOF_MODE_EFFORT
+        dof_prop["driveMode"] = gymapi.DOF_MODE_POS
 
         self.gym.set_actor_dof_properties(env_ptr, humanoid_handle, dof_prop)
         body_props = self.gym.get_actor_rigid_body_properties(env_ptr, humanoid_handle)
@@ -742,6 +755,7 @@ class Humanoid(BaseTask):
         self.actions = actions
 
         self.render()
+
         for _ in range(self.control_freq_inv):
             self.pre_physics_step(self.actions)
             self.gym.simulate(self.sim)
@@ -760,11 +774,10 @@ class Humanoid(BaseTask):
 
 
     def pre_physics_step(self, actions):
-        actions_scaled = actions * (1 / self.control_freq_inv)
-        torques = self.p_gains * (actions_scaled + self.default_dof_pos - self._dof_pos) - self.d_gains * self._dof_vel
-        torques = torch.clamp(torques, -self.torque_limits, self.torque_limits)
-        force_tensor = gymtorch.unwrap_tensor(torques)
-        self.gym.set_dof_actuation_force_tensor(self.sim, force_tensor)
+        #### Hz < 500 use PD control rather than torque control
+        pd_tar = self.default_dof_pos + self._pd_action_scale * actions * (1 / self.control_freq_inv)
+        pd_tar_tensor = gymtorch.unwrap_tensor(pd_tar)
+        self.gym.set_dof_position_target_tensor(self.sim, pd_tar_tensor)
         return
 
     def post_physics_step(self):

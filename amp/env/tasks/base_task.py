@@ -426,7 +426,7 @@ class BaseTask():
 
                     writer.close()
                     self._video_queue = deque(maxlen = self.max_video_queue_size)
-                    self._write_states_to_file(curr_states_file_name)
+                    #self._write_states_to_file(curr_states_file_name)
                     print(f"============ Video finished writing ============")
 
 

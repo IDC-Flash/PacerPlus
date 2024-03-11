@@ -48,7 +48,7 @@ env:
   trajSampleTimestep: 0.5
   speedMin: 0.0
   speedMax: 2.0
-  accelMax: 0.5
+  accelMax: 1.0
   sharpTurnProb: 0.02
   useExtendedTrajectoy: True
   enableTaskObs: True
@@ -65,7 +65,7 @@ env:
 
   asset:
     assetRoot: "/"
-    assetFileName: "amp/data/robot/h1/urdf/h1.urdf"
+    assetFileName: "amp/data/robot/h1_update/urdf/h1.urdf"
 
   terrain:
     terrainType: trimesh # none, plane, or trimesh
