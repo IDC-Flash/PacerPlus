@@ -265,7 +265,7 @@ class HumanoidAMP(Humanoid):
     def _setup_character_props(self, key_bodies):
         super()._setup_character_props(key_bodies)
 
-        self._num_amp_obs_per_step = 46
+        self._num_amp_obs_per_step = 29
 
         if (self._enable_hist_obs):
             self._num_self_obs += self._num_amp_obs_steps * self._num_amp_obs_per_step
@@ -350,11 +350,11 @@ class HumanoidAMP(Humanoid):
         dof_pos = get_euler_xyz(dof_pos)
         dof_pos = (dof_pos.reshape(B, N, 3)) 
 
-        dof_pos = torch.cat(( dof_pos[:, 0, [2, 0, 1]], dof_pos[:, 1, 2:3], dof_pos[:, 2, 2:3],
-                              dof_pos[:, 3, [2, 0, 1]], dof_pos[:, 4, 2:3], dof_pos[:, 5, 2:3], 
-                              dof_pos[:, 6, 2:3],
-                              dof_pos[:, 7, [1, 0, 2]], dof_pos[:, 8, 2:3],
-                              dof_pos[:, 9, [1, 0, 2]], dof_pos[:, 10, 2:3],
+        dof_pos = torch.cat(( dof_pos[:, 0, [2, 0, 1]], dof_pos[:, 1, 1:2], dof_pos[:, 2, 1:2],
+                              dof_pos[:, 3, [2, 0, 1]], dof_pos[:, 4, 1:2], dof_pos[:, 5, 1:2], 
+                              dof_pos[:, 6, 1:2],
+                              dof_pos[:, 7, [1, 0, 2]], dof_pos[:, 8, 1:2],
+                              dof_pos[:, 9, [1, 0, 2]], dof_pos[:, 1:3],
                               ), dim=-1)
         #dof_pos[:, 11] *= 0
         dof_pos += self.default_dof_pos
@@ -366,11 +366,11 @@ class HumanoidAMP(Humanoid):
         dof_vel = dof_vel.reshape(B*N, 4)
         dof_vel = get_euler_xyz(dof_vel)
         dof_vel = dof_vel.reshape(B, N, 3) 
-        dof_vel = torch.cat(( dof_vel[:, 0, [2, 0, 1]], dof_vel[:, 1, 2:3], dof_vel[:, 2, 2:3],
-                              dof_vel[:, 3, [2, 0, 1]], dof_vel[:, 4, 2:3], dof_vel[:, 5, 2:3], 
-                              dof_vel[:, 6, 2:3],
-                              dof_vel[:, 7, [1, 0, 2]], dof_vel[:, 8, 2:3],
-                              dof_vel[:, 9,[1, 0, 2]], dof_vel[:, 10, 2:3],
+        dof_vel = torch.cat(( dof_vel[:, 0, [2, 0, 1]], dof_vel[:, 1, 1:2], dof_vel[:, 2, 1:2],
+                              dof_vel[:, 3, [2, 0, 1]], dof_vel[:, 4, 1:2], dof_vel[:, 5, 1:2], 
+                              dof_vel[:, 6, 1:2],
+                              dof_vel[:, 7, [1, 0, 2]], dof_vel[:, 8, 1:2],
+                              dof_vel[:, 9,[1, 0, 2]], dof_vel[:, 10, 1:2],
                               ), dim=-1)
         #dof_pos[:, :10] += self.default_do    
         motion_res["dof_pos"] = dof_pos
@@ -593,7 +593,7 @@ def build_robot_amp_observation(root_pos, root_rot, root_vel, root_ang_vel, dof_
     local_root_ang_vel = torch_utils.my_quat_rotate(heading_rot, root_ang_vel)
     remove_id = [4, 9]
     selected_id = [0, 1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18]
-    obs = torch.cat((root_rot_obs, local_root_vel, local_root_ang_vel, dof_pos[..., selected_id], dof_vel[..., selected_id]), dim=-1)
+    obs = torch.cat((root_rot_obs, local_root_vel, local_root_ang_vel, dof_pos[..., selected_id]), dim=-1)
                     
     return obs
 
