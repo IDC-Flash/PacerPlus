@@ -7,6 +7,7 @@
 
 from env.tasks.humanoid import Humanoid
 from env.tasks.humanoid_amp import HumanoidAMP
+from env.tasks.humanoid_view_motion import HumanoidViewMotion
 from env.tasks.humanoid_amp_task import HumanoidAMPTask
 from env.tasks.humanoid_traj import HumanoidTraj
 from env.tasks.humanoid_pedestrian import HumanoidPedestrian

@@ -40,7 +40,6 @@ class AMPAgent(common_agent.CommonAgent):
 
 
         self.motion_sym_loss = self.vec_env.env.task.motion_sym_loss
-        self.phase_reconstruction_loss = self.vec_env.env.task.phase_reconstruction_loss
 
         pretrained_model_cp = config.get('pretrained_model_cp', None)
         if pretrained_model_cp is not None and not config.get('load_checkpoint', False):
@@ -302,24 +301,23 @@ class AMPAgent(common_agent.CommonAgent):
         return train_info
 
     def post_epoch(self, epoch_num):
-        if self.vec_env.env.task.smpl_humanoid:
-            humanoid_env = self.vec_env.env.task
-            if humanoid_env.has_shape_variation and (epoch_num > 0) and epoch_num % humanoid_env.shape_resampling_interval == 0:
-                print("Resampling Shape")
-                humanoid_env.resample_motions()
+        humanoid_env = self.vec_env.env.task
+        # if humanoid_env.has_shape_variation and (epoch_num > 0) and epoch_num % humanoid_env.shape_resampling_interval == 0:
+        #     print("Resampling Shape")
+        #     humanoid_env.resample_motions()
 
-            if epoch_num > 10000:
-                humanoid_env.use_imitation_reset=True
+        # if epoch_num > 10000:
+        #     humanoid_env.use_imitation_reset=True
 
-            if humanoid_env.getup_schedule:
-                getup_udpate_epoch = 10000
-                humanoid_env.update_getup_schedule(epoch_num, getup_udpate_epoch = getup_udpate_epoch)
-                if epoch_num > getup_udpate_epoch: # ZL fix janky hack
-                    self._task_reward_w = 0.5
-                    self._disc_reward_w = 0.5
-                else:
-                    self._task_reward_w = 0
-                    self._disc_reward_w = 1
+        # if humanoid_env.getup_schedule:
+        #     getup_udpate_epoch = 10000
+        #     humanoid_env.update_getup_schedule(epoch_num, getup_udpate_epoch = getup_udpate_epoch)
+        #     if epoch_num > getup_udpate_epoch: # ZL fix janky hack
+        #         self._task_reward_w = 0.5
+        #         self._disc_reward_w = 0.5
+        #     else:
+        #         self._task_reward_w = 0
+        #         self._disc_reward_w = 1
 
     def calc_gradients(self, input_dict):
         self.set_train()
@@ -412,11 +410,6 @@ class AMPAgent(common_agent.CommonAgent):
                 loss += s_loss * self.sym_loss_coef
 
             a_clip_frac = torch.mean(a_info['actor_clipped'].float())
-
-            if self.phase_reconstruction_loss:
-                reconstrunction_loss = self.model.a2c_network.compute_reconstruction_loss(batch_dict['obs'])
-                recon_info = {'phase_reconstruction_loss': reconstrunction_loss}
-                loss += reconstrunction_loss
             a_info['actor_loss'] = a_loss
             a_info['actor_clip_frac'] = a_clip_frac
             c_info['critic_loss'] = c_loss
@@ -469,8 +462,7 @@ class AMPAgent(common_agent.CommonAgent):
         self.train_result.update(disc_info)
         if self.motion_sym_loss:
             self.train_result.update(s_info)
-        if self.phase_reconstruction_loss:
-            self.train_result.update(recon_info)
+
 
         return
 
@@ -500,7 +492,7 @@ class AMPAgent(common_agent.CommonAgent):
         config['use_temporal_buf'] = self.vec_env.env.task.use_temporal_buf
         config['temporal_buf_length'] = self.vec_env.env.task._temporal_buf_length ####### for self observation, with out task
         config['has_flip_observation'] = self.vec_env.env.task.has_flip_observation
-        config['left_right_index'] = self.vec_env.env.task.left_to_right_index_action
+        #config['left_right_index'] = self.vec_env.env.task.left_to_right_index_action
         config['amp_temporal_length'] = self.vec_env.env.task._num_amp_obs_steps
         # config['use_trajectory_velocity'] = self.vec_env.env.task.use_trajectory_velocity
         if self.vec_env.env.task.has_task:
@@ -752,10 +744,7 @@ class AMPAgent(common_agent.CommonAgent):
                 'info/sym_loss',
                 torch_ext.mean_list(train_info['sym_loss']).item(), frame)
         
-        if self.phase_reconstruction_loss:
-            self.writer.add_scalar(
-                'info/phase_reconstruction_loss',
-                torch_ext.mean_list(train_info['phase_reconstruction_loss']).item(), frame)
+
 
 
         disc_reward_std, disc_reward_mean = torch.std_mean(
@@ -794,11 +783,7 @@ class AMPAgent(common_agent.CommonAgent):
                 "sym_loss":
                 torch_ext.mean_list(train_info['sym_loss']).item()
             })
-        if self.phase_reconstruction_loss:
-            train_info_dict.update({
-                "phase_reconstruction_loss":
-                torch_ext.mean_list(train_info['phase_reconstruction_loss']).item()
-            })
+
         return train_info_dict
 
     def _amp_debug(self, info):

@@ -73,7 +73,7 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
                 config['use_temporal_buf'] = self.env.task.use_temporal_buf
                 config['temporal_buf_length'] = self.env.task._temporal_buf_length ####### for self observation, with out task
                 config['has_flip_observation'] = self.task.has_flip_observation
-                config['left_right_index'] = self.task.left_to_right_index_action
+                #config['left_right_index'] = self.task.left_to_right_index_action
                 config['amp_temporal_length'] = self.task._num_amp_obs_steps
                 #config['use_trajectory_velocity'] = self.task.use_trajectory_velocity
 
@@ -87,7 +87,7 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
                 config['use_temporal_buf'] = self.vec_env.env.task.use_temporal_buf
                 config['temporal_buf_length'] = self.vec_env.env.task._temporal_buf_length ####### for self observation, with out task
                 config['has_flip_observation'] = self.vec_env.env.task.has_flip_observation
-                config['left_right_index'] = self.vec_env.env.task.left_to_right_index_action
+                #config['left_right_index'] = self.vec_env.env.task.left_to_right_index_action
                 config['amp_temporal_length'] = self.vec_env.env.task._num_amp_obs_steps
                 #config['use_trajectory_velocity'] = self.vec_env.env.use_trajectory_velocity
 

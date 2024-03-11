@@ -17,6 +17,7 @@ from isaacgym import gymtorch
 from isaacgym.torch_utils import *
 from amp.utils.flags import flags
 from amp.utils.draw_utils import agt_color
+from amp.env.tasks.humanoid import get_euler_xyz
 
 class HumanoidTraj(humanoid_amp_task.HumanoidAMPTask):
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
@@ -40,7 +41,7 @@ class HumanoidTraj(humanoid_amp_task.HumanoidAMPTask):
 
         if (not self.headless):
             self._build_marker_state_tensors()
-
+        self.reward_raw = torch.zeros((self.num_envs)).to(self.device)
         return
 
     def get_task_obs_size(self):
@@ -58,7 +59,7 @@ class HumanoidTraj(humanoid_amp_task.HumanoidAMPTask):
     def _update_marker(self):
         traj_samples = self._fetch_traj_samples()
         self._marker_pos[:] = traj_samples
-        self._marker_pos[..., 2] = self._humanoid_root_states[..., 2:3]  # jp hack # ZL hack
+        self._marker_pos[..., 2] = self._base_pos[..., 2:3]  # jp hack # ZL hack
 
         self.gym.set_actor_root_state_tensor_indexed(self.sim, gymtorch.unwrap_tensor(self._root_states),
                                                      gymtorch.unwrap_tensor(self._traj_marker_actor_ids),
@@ -92,8 +93,8 @@ class HumanoidTraj(humanoid_amp_task.HumanoidAMPTask):
 
         return
 
-    def _build_env(self, env_id, env_ptr, humanoid_asset):
-        super()._build_env(env_id, env_ptr, humanoid_asset)
+    def _build_env(self, env_id, env_ptr, humanoid_asset, dof_props_asset, rigid_shape_props_asset):
+        super()._build_env(env_id, env_ptr, humanoid_asset, dof_props_asset, rigid_shape_props_asset)
 
         if (not self.headless):
             self._build_marker(env_id, env_ptr)
@@ -114,7 +115,7 @@ class HumanoidTraj(humanoid_amp_task.HumanoidAMPTask):
                                                       self._accel_max, self._sharp_turn_prob)
 
         env_ids = torch.arange(self.num_envs, device=self.device, dtype=torch.long)
-        root_pos = self._humanoid_root_states[:, 0:3]
+        root_pos = self._base_pos[:, 0:3]
         self._traj_gen.reset(env_ids, root_pos)
 
         return
@@ -145,15 +146,15 @@ class HumanoidTraj(humanoid_amp_task.HumanoidAMPTask):
     def _reset_task(self, env_ids):
         super()._reset_task(env_ids)
 
-        root_pos = self._humanoid_root_states[env_ids, 0:3]
+        root_pos = self._root_states[env_ids, 0:3]
         self._traj_gen.reset(env_ids, root_pos)
         return
 
     def _compute_task_obs(self, env_ids=None):
         if (env_ids is None):
-            root_states = self._humanoid_root_states
+            root_states = self._humanoid_root_states.clone()
         else:
-            root_states = self._humanoid_root_states[env_ids]
+            root_states = self._humanoid_root_states.clone()[env_ids]
 
         traj_samples = self._fetch_traj_samples(env_ids)
         obs = compute_location_observations(root_states, traj_samples)
@@ -178,7 +179,7 @@ class HumanoidTraj(humanoid_amp_task.HumanoidAMPTask):
         tar_pos = self._traj_gen.calc_pos(env_ids, time)
 
         self.rew_buf[:] = compute_location_reward(root_pos, tar_pos)
-
+        self.reward_raw = self.rew_buf.clone().unsqueeze(-1)
         return
 
     def _compute_reset(self):
@@ -187,10 +188,10 @@ class HumanoidTraj(humanoid_amp_task.HumanoidAMPTask):
         tar_pos = self._traj_gen.calc_pos(env_ids, time)
 
         self.reset_buf[:], self._terminate_buf[:] = compute_humanoid_reset(self.reset_buf, self.progress_buf,
-                                                           self._contact_forces, self._contact_body_ids,
-                                                           self._rigid_body_pos, tar_pos,
+                                                           self._contact_forces, self._termination_contact_body_ids,
+                                                           self._base_quat.clone(), self._base_pos.clone(), tar_pos,
                                                            self.max_episode_length, self._fail_dist,
-                                                           self._enable_early_termination, self._termination_heights)
+                                                           self._enable_early_termination)
         return
 
     def _fetch_traj_samples(self, env_ids=None):
@@ -263,54 +264,35 @@ def compute_location_reward(root_pos, tar_pos):
 
     return reward
 
-# @torch.jit.script
-# def compute_location_reward(root_pos, tar_pos):
-#     # type: (Tensor, Tensor) -> Tensor
-#     pos_err_scale = 2.0
-#     radius = 0.1
-#     pos_diff = tar_pos[..., 0:2] - root_pos[..., 0:2]
-#     pos_diff[pos_diff < radius] = 0 # 10m radius around target is perfect.
-#     pos_err = torch.sum(pos_diff * pos_diff, dim=-1)
-
-#     pos_reward = torch.exp(-pos_err_scale * pos_err)
-
-#     reward = pos_reward
-
-#     return reward
-
 
 @torch.jit.script
-def compute_humanoid_reset(reset_buf, progress_buf, contact_buf, contact_body_ids, rigid_body_pos,
-                           tar_pos, max_episode_length, fail_dist,
-                           enable_early_termination, termination_heights):
-    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, float, float, bool, Tensor) -> Tuple[Tensor, Tensor]
+def compute_humanoid_reset(reset_buf, progress_buf, contact_buf,
+                           termination_contact_body_ids, base_quat, root_pos, tar_pos,
+                           max_episode_length, fail_dist, enable_early_termination):
+    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, float, float, bool) -> Tuple[Tensor, Tensor]
     terminated = torch.zeros_like(reset_buf)
 
     if (enable_early_termination):
-        masked_contact_buf = contact_buf.clone()
-        masked_contact_buf[:, contact_body_ids, :] = 0
-        fall_contact = torch.any(torch.abs(masked_contact_buf) > 0.1, dim=-1)
-        fall_contact = torch.any(fall_contact, dim=-1)
+        fall_contact = torch.any(torch.norm(contact_buf[:,termination_contact_body_ids], dim=-1) > 1, dim=1)
 
-        body_height = rigid_body_pos[..., 2]
-        fall_height = body_height < termination_heights
-        fall_height[:, contact_body_ids] = False
-        fall_height = torch.any(fall_height, dim=-1)
 
-        has_fallen = torch.logical_and(fall_contact, fall_height)
-        # first timestep can sometimes still have nonzero contact forces
-        # so only check after first couple of steps
-        has_fallen *= (progress_buf > 1)
+        rpy = get_euler_xyz(base_quat)
+        fall_rpy = torch.logical_or(torch.abs(rpy[:,1])>1.0, torch.abs(rpy[:,0])>0.8)
 
-        root_pos = rigid_body_pos[..., 0, :]
         tar_delta = tar_pos[..., 0:2] - root_pos[..., 0:2]
         tar_dist_sq = torch.sum(tar_delta * tar_delta, dim=-1)
         tar_fail = tar_dist_sq > fail_dist * fail_dist
 
-        has_failed = torch.logical_or(has_fallen, tar_fail)
+        has_fallen = torch.logical_or(fall_contact, fall_rpy)
+        has_fallen = torch.logical_or(has_fallen, tar_fail)
 
-        terminated = torch.where(has_failed, torch.ones_like(reset_buf), terminated)
+        has_fallen *= (progress_buf > 1)
+        terminated = torch.where(has_fallen, torch.ones_like(reset_buf), terminated)
 
-    reset = torch.where(progress_buf >= max_episode_length - 1, torch.ones_like(reset_buf), terminated)
+
+    reset = torch.where(progress_buf >= max_episode_length - 1,
+                        torch.ones_like(reset_buf), terminated)
+    # import ipdb
+    # ipdb.set_trace()
 
     return reset, terminated

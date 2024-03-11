@@ -2,7 +2,7 @@
 notes:  "Capsual Model, rotation amp observation, large data, big ankle"
 project_name: "crossroad_smpl"
 env:
-  # motion_file: data/amass/pkls/amass_isaac_run_upright_slim.pkl
+  motion_file: data/amass/pkls/amass_isaac_run_upright_slim.pkl
   # imitation_motion_file: data/amass/pkls/amass_isaac_im_train_take6_upright_slim.pkl
 
   terrain_obs: True
@@ -26,42 +26,15 @@ env:
   num_env_group: 512
   velocity_map: False
 
-  bias_offset: False
-  big_ankle: True
-  has_tracking_mask: True
-  has_tracking_mask_obs: True
-  has_self_collision: True
-  has_mesh: False
-  has_jt_limit: False
-  has_dof_subset: True
-  has_upright_start: True
-  has_smpl_pd_offset: False
-  remove_toe: False
-  real_weight_porpotion: True
-  kp_scale: 4.0
-  motion_sym_loss: True
-  
-  default_humanoid_mass: 92
-  sym_loss_coef: 1
-  real_weight: True
-  remove_foot_reset_im: True
-  remove_toe_im: True
-  full_body_reward: False
   power_reward: True
+  has_shape_variation: False
 
-  has_shape_obs: True
-  has_shape_obs_disc: True
-  has_shape_variation: True
-  shape_resampling_interval: 500
-
-  pdControl: True
   powerScale: 1.0
-  controlFrequencyInv: 2 # 30 Hz
+  controlFrequencyInv: 4 # 50 Hz
   stateInit: "Random"
   hybridInitProb: 0.5
-  numAMPObsSteps: 10
-  ampSMPLKeypointObs: False
-  ampKeyBodyDofObs: True
+  numAMPObsSteps: 2
+
 
   localRootObs: True
   rootHeightObs: False
@@ -75,7 +48,7 @@ env:
   trajSampleTimestep: 0.5
   speedMin: 0.0
   speedMax: 3.0
-  accelMax: 2.0
+  accelMax: 2
   sharpTurnProb: 0.02
   useExtendedTrajectoy: True
   enableTaskObs: True
@@ -117,18 +90,18 @@ env:
     restitution: 0.0
 
 sim:
-  substeps: 2
+  substeps: 1
   physx:
     num_threads: 4
     solver_type: 1  # 0: pgs, 1: tgs
     num_position_iterations: 4
     num_velocity_iterations: 0
-    contact_offset: 0.02
+    contact_offset: 0.01
     rest_offset: 0.0
-    bounce_threshold_velocity: 0.2
-    max_depenetration_velocity: 10.0
-    default_buffer_size_multiplier: 10.0
-
+    bounce_threshold_velocity: 0.5
+    max_depenetration_velocity: 1.0
+    default_buffer_size_multiplier: 5
+    contact_collection: 2
   flex:
     num_inner_iterations: 10
     warm_start: 0.25
@@ -139,13 +112,13 @@ params:
   seed: 0
 
   algo:
-    name: common
+    name: amp_continuous
 
   model:
-    name: common
+    name: continuous_amp
 
   network:
-    name: common
+    name: amp
     separate: True
 
     space:
@@ -162,7 +135,7 @@ params:
 
     mlp:
       units: [1024, 512]
-      activation: relu
+      activation: elu
       d2rl: False
       
       initializer:
@@ -172,7 +145,7 @@ params:
 
     disc:
       units: [1024, 512]
-      activation: relu
+      activation: elu
 
       initializer:
         name: default
@@ -219,8 +192,8 @@ params:
     amp_minibatch_size: 4096
     disc_coef: 5
     disc_logit_reg: 0.01
-    disc_grad_penalty: 5
-    disc_reward_scale: 2
+    disc_grad_penalty: 1.0
+    disc_reward_scale: 10
     disc_weight_decay: 0.0001
     normalize_amp_input: True
 

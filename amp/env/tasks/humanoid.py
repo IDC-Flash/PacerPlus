@@ -66,6 +66,7 @@ class Humanoid(BaseTask):
         self.dt = self.control_freq_inv * sim_params.dt
         self._setup_tensors()
         self.reward_raw = torch.zeros((self.num_envs, 1)).to(self.device)
+        self._state_reset_happened = False
 
         return
 
@@ -124,11 +125,14 @@ class Humanoid(BaseTask):
         self._root_states = gymtorch.wrap_tensor(actor_root_state)
         num_actors = self.get_num_actors_per_env()
 
+        self._humanoid_root_states = self._root_states.view(
+            self.num_envs, num_actors, actor_root_state.shape[-1])[..., 0, :]
+
         self._humanoid_actor_ids = num_actors * torch.arange(
             self.num_envs, device=self.device, dtype=torch.int32)
         
-        self._base_quat = self._root_states[:, 3:7]
-        self._base_pos = self._root_states[:self.num_envs, 0:3]
+        self._base_quat = self._humanoid_root_states[:self.num_envs, 3:7]
+        self._base_pos = self._humanoid_root_states[:self.num_envs, 0:3]
 
         self._dof_state = gymtorch.wrap_tensor(dof_state_tensor)
         dofs_per_env = self._dof_state.shape[0] // self.num_envs
@@ -387,6 +391,7 @@ class Humanoid(BaseTask):
 
     def _reset_envs(self, env_ids):
         if (len(env_ids) > 0):
+            self._state_reset_happened = True
             self._reset_actors(env_ids)
             self._reset_env_tensors(env_ids)
             self._refresh_sim_tensors()
@@ -515,17 +520,17 @@ class Humanoid(BaseTask):
             self._build_env(i, env_ptr, self.robot_assets[i], dof_props_asset, rigid_shape_props_asset)
             self.envs.append(env_ptr)
 
-        self._feet_indices = torch.zeros(len(feet_names), dtype=torch.long, device=self.device, requires_grad=False)
+        self._contact_body_ids = torch.zeros(len(feet_names), dtype=torch.long, device=self.device, requires_grad=False)
         for i in range(len(feet_names)):
-            self._feet_indices[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.humanoid_handles[0], feet_names[i])
+            self._contact_body_ids[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.humanoid_handles[0], feet_names[i])
 
         self._penalised_contact_indices = torch.zeros(len(penalized_contact_names), dtype=torch.long, device=self.device, requires_grad=False)
         for i in range(len(penalized_contact_names)):
             self._penalised_contact_indices[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.humanoid_handles[0], penalized_contact_names[i])
 
-        self._contact_body_ids = torch.zeros(len(termination_contact_names), dtype=torch.long, device=self.device, requires_grad=False)
+        self._termination_contact_body_ids = torch.zeros(len(termination_contact_names), dtype=torch.long, device=self.device, requires_grad=False)
         for i in range(len(termination_contact_names)):
-            self._contact_body_ids[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.humanoid_handles[0], termination_contact_names[i])
+            self._termination_contact_body_ids[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.humanoid_handles[0], termination_contact_names[i])
 
         return
 
@@ -597,7 +602,7 @@ class Humanoid(BaseTask):
         else:
             col_group = env_id  # no inter-environment collision
 
-        col_filter = 0 # 1 for has self collision
+        col_filter = 1 # 1 for has self collision
         start_pose = gymapi.Transform()    
         char_h = 0.89
         pos = torch.tensor(get_axis_params(char_h, self.up_axis_idx)).to(self.device)
@@ -639,7 +644,7 @@ class Humanoid(BaseTask):
     def _compute_reset(self):
         self.reset_buf[:], self._terminate_buf[:] = compute_humanoid_reset(
             self.reset_buf, self.progress_buf, self._contact_forces,
-            self._contact_body_ids, self._dof_pos.clone(),
+            self._termination_contact_body_ids, self._base_quat.clone(),
             self.max_episode_length, self._enable_early_termination)
         return
 
@@ -647,10 +652,16 @@ class Humanoid(BaseTask):
         self.gym.refresh_dof_state_tensor(self.sim)
         self.gym.refresh_actor_root_state_tensor(self.sim)
         self.gym.refresh_net_contact_force_tensor(self.sim)
+        if self._state_reset_happened and "default_dof_pos" in self.__dict__:
+            # ZL: Hack to get rigidbody pos and rot to be the correct values. Needs to be called after _set_env_state
+            env_ids = self._reset_ref_env_ids
+            if len(env_ids) > 0:
+                self._dof_pos[env_ids] = self.default_dof_pos
+                self._state_reset_happened = False
         return
 
     def _compute_observations(self, env_ids=None):
-        obs = self._compute_robot_obs(env_ids)
+        obs = self._compute_humanoid_obs(env_ids)
         if (env_ids is None):
             self.obs_buf[:] = obs
         else:
@@ -659,12 +670,12 @@ class Humanoid(BaseTask):
         return
 
 
-    def _compute_robot_obs(self, env_ids=None):
+    def _compute_humanoid_obs(self, env_ids=None):
         if env_ids is None:
             root_pos = self._base_pos.clone()
             root_rot = self._base_quat.clone()
-            root_vel = self._root_states[:, 7:10].clone()
-            root_ang_vel = self._root_states[:, 10:13].clone()
+            root_vel = self._humanoid_root_states[:, 7:10].clone()
+            root_ang_vel = self._humanoid_root_states[:, 10:13].clone()
             dof_pos = self._dof_pos.clone()
             dof_vel = self._dof_vel.clone()
             action = self.actions.clone()
@@ -674,8 +685,8 @@ class Humanoid(BaseTask):
             root_rot = self._base_quat[env_ids].clone()
             dof_pos = self._dof_pos[env_ids].clone()
             dof_vel = self._dof_vel[env_ids].clone()
-            root_vel = self._root_states[env_ids, 7:10].clone()
-            root_ang_vel = self._root_states[env_ids, 10:13].clone()
+            root_vel = self._humanoid_root_states[env_ids, 7:10].clone()
+            root_ang_vel = self._humanoid_root_states[env_ids, 10:13].clone()
             action = self.actions[env_ids].clone()
             gravity_vec = self.gravity_vec[env_ids].clone()
 
@@ -700,7 +711,7 @@ class Humanoid(BaseTask):
         Args:
             env_ids (List[int]): Environemnt ids
         """
-        self._dof_pos[env_ids] = self.default_dof_pos * torch_rand_float(0.5, 1.5, (len(env_ids), self.num_dofs), device=self.device)
+        self._dof_pos[env_ids] = self.default_dof_pos
         self._dof_vel[env_ids] = 0.
 
         env_ids_int32 = env_ids.to(dtype=torch.int32)
@@ -715,10 +726,10 @@ class Humanoid(BaseTask):
         # base position
         base_root_pos = torch.tensor([0, 0, 1]).to(self.device).unsqueeze(0).repeat((len(env_ids), 1)).float()
         base_root_rot = torch.tensor([0, 0, 0, 1]).to(self.device).unsqueeze(0).repeat((len(env_ids), 1)).float()
-        self._root_states[env_ids, 0:3] = base_root_pos
-        self._root_states[env_ids, 3:7] = base_root_rot
+        self._humanoid_root_states[env_ids, 0:3] = base_root_pos
+        self._humanoid_root_states[env_ids, 3:7] = base_root_rot
         # base velocities
-        self._root_states[env_ids, 7:13] = torch_rand_float(-0.5, 0.5, (len(env_ids), 6), device=self.device) # [7:10]: lin vel, [10:13]: ang vel
+        self._humanoid_root_states[env_ids, 7:13] = torch_rand_float(-0.5, 0.5, (len(env_ids), 6), device=self.device) # [7:10]: lin vel, [10:13]: ang vel
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         self.gym.set_actor_root_state_tensor_indexed(self.sim, gymtorch.unwrap_tensor(self._root_states), gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
 
@@ -731,8 +742,8 @@ class Humanoid(BaseTask):
         self.actions = actions
 
         self.render()
-        for _ in range(self.control_freq_inv):
-            self.torques = self.pre_physics_step(self.actions)
+        for _ in range(4):
+            self.pre_physics_step(self.actions)
             self.gym.simulate(self.sim)
             self.gym.refresh_dof_state_tensor(self.sim)
 
@@ -751,6 +762,7 @@ class Humanoid(BaseTask):
     def pre_physics_step(self, actions):
         actions_scaled = actions * 0.25
         torques = self.p_gains*(actions_scaled + self.default_dof_pos - self._dof_pos) - self.d_gains * self._dof_vel
+        torques = torch.clamp(torques, -self.torque_limits, self.torque_limits)
         force_tensor = gymtorch.unwrap_tensor(torques)
         self.gym.set_dof_actuation_force_tensor(self.sim, force_tensor)
         return
@@ -783,7 +795,7 @@ class Humanoid(BaseTask):
 
     def _init_camera(self):
         self.gym.refresh_actor_root_state_tensor(self.sim)
-        self._cam_prev_char_pos = self._root_states[
+        self._cam_prev_char_pos = self._humanoid_root_states[
             0, 0:3].cpu().numpy()
 
         cam_pos = gymapi.Vec3(self._cam_prev_char_pos[0],
@@ -795,7 +807,7 @@ class Humanoid(BaseTask):
 
     def _update_camera(self):
         self.gym.refresh_actor_root_state_tensor(self.sim)
-        char_root_pos = self._root_states[0, 0:3].cpu().numpy()
+        char_root_pos = self._humanoid_root_states[0, 0:3].cpu().numpy()
 
         cam_trans = self.gym.get_viewer_camera_transform(self.viewer, None)
         cam_pos = np.array([cam_trans.p.x, cam_trans.p.y, cam_trans.p.z])
@@ -888,7 +900,7 @@ def copysign(a, b):
     a = torch.tensor(a, device=b.device, dtype=torch.float).repeat(b.shape[0])
     return torch.abs(a) * torch.sign(b)
 
-@torch.jit.script
+#@torch.jit.script
 def get_euler_xyz(q):
     # type: (Tensor)  -> Tensor
     qx, qy, qz, qw = 0, 1, 2, 3
@@ -911,7 +923,7 @@ def get_euler_xyz(q):
 
     return torch.stack((roll, pitch, yaw), dim=-1)
 
-@torch.jit.script
+#@torch.jit.script
 def compute_robot_observation(root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, actions, gravity_vec, default_dof_pos, ):
     # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor) -> Tensor
     erular_xyz = get_euler_xyz(root_rot)
@@ -937,20 +949,21 @@ def compute_humanoid_reward(obs_buf):
 
 @torch.jit.script
 def compute_humanoid_reset(reset_buf, progress_buf, contact_buf,
-                           contact_body_ids, base_quat,
+                           termination_contact_body_ids, base_quat,
                            max_episode_length, enable_early_termination):
     # type: (Tensor, Tensor, Tensor, Tensor, Tensor, float, bool) -> Tuple[Tensor, Tensor]
     terminated = torch.zeros_like(reset_buf)
 
     if (enable_early_termination):
-        masked_contact_buf = contact_buf.clone()
-        masked_contact_buf[:, contact_body_ids, :] = 0
-        fall_contact = torch.any(torch.norm(masked_contact_buf, dim=-1) > 1., dim=1)
+        # masked_contact_buf = contact_buf.clone()
+        # masked_contact_buf[:, contact_body_ids, :] = 0
+        # fall_contact = torch.any(torch.norm(masked_contact_buf, dim=-1) > 0.1, dim=1)
+        fall_contact = torch.any(torch.norm(contact_buf[:,termination_contact_body_ids], dim=-1) > 1, dim=1)
 
         rpy = get_euler_xyz(base_quat)
         fall_rpy = torch.logical_or(torch.abs(rpy[:,1])>1.0, torch.abs(rpy[:,0])>0.8)
 
-        has_fallen = torch.logical_and(fall_contact, fall_rpy)
+        has_fallen = torch.logical_or(fall_contact, fall_rpy)
         has_fallen *= (progress_buf > 1)
         terminated = torch.where(has_fallen, torch.ones_like(reset_buf), terminated)
 
