@@ -742,7 +742,7 @@ class Humanoid(BaseTask):
         self.actions = actions
 
         self.render()
-        for _ in range(4):
+        for _ in range(self.control_freq_inv):
             self.pre_physics_step(self.actions)
             self.gym.simulate(self.sim)
             self.gym.refresh_dof_state_tensor(self.sim)
@@ -760,8 +760,8 @@ class Humanoid(BaseTask):
 
 
     def pre_physics_step(self, actions):
-        actions_scaled = actions * 0.25
-        torques = self.p_gains*(actions_scaled + self.default_dof_pos - self._dof_pos) - self.d_gains * self._dof_vel
+        actions_scaled = actions * (1 / self.control_freq_inv)
+        torques = self.p_gains * (actions_scaled + self.default_dof_pos - self._dof_pos) - self.d_gains * self._dof_vel
         torques = torch.clamp(torques, -self.torque_limits, self.torque_limits)
         force_tensor = gymtorch.unwrap_tensor(torques)
         self.gym.set_dof_actuation_force_tensor(self.sim, force_tensor)

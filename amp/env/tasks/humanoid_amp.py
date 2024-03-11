@@ -512,6 +512,7 @@ class HumanoidAMP(Humanoid):
         self._humanoid_root_states[env_ids, 10:13] = root_ang_vel
         self._dof_pos[env_ids] = dof_pos
         self._dof_vel[env_ids] = dof_vel
+        self._reset_dof_pos = self._dof_pos[env_ids].clone()
 
         if (not rigid_body_pos is None) and (not rigid_body_rot is None):
             self._rigid_body_pos[env_ids] = rigid_body_pos
@@ -522,6 +523,18 @@ class HumanoidAMP(Humanoid):
             self._reset_rb_pos = self._rigid_body_pos[env_ids].clone()
             self._reset_rb_rot = self._rigid_body_rot[env_ids].clone()
 
+        return
+    
+    def _refresh_sim_tensors(self):
+        self.gym.refresh_dof_state_tensor(self.sim)
+        self.gym.refresh_actor_root_state_tensor(self.sim)
+        self.gym.refresh_net_contact_force_tensor(self.sim)
+        if self._state_reset_happened and "_reset_dof_pos" in self.__dict__:
+            # ZL: Hack to get rigidbody pos and rot to be the correct values. Needs to be called after _set_env_state
+            env_ids = self._reset_ref_env_ids
+            if len(env_ids) > 0:
+                self._dof_pos[env_ids] = self._reset_dof_pos
+                self._state_reset_happened = False
         return
 
     def _update_hist_amp_obs(self, env_ids=None):

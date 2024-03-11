@@ -47,8 +47,8 @@ env:
   numTrajSamples: 10
   trajSampleTimestep: 0.5
   speedMin: 0.0
-  speedMax: 3.0
-  accelMax: 2
+  speedMax: 2.0
+  accelMax: 0.5
   sharpTurnProb: 0.02
   useExtendedTrajectoy: True
   enableTaskObs: True
@@ -134,7 +134,7 @@ params:
         learn_sigma: False
 
     mlp:
-      units: [1024, 512]
+      units: [512, 256]
       activation: elu
       d2rl: False
       
@@ -144,7 +144,7 @@ params:
         name: None
 
     disc:
-      units: [1024, 512]
+      units: [512, 256]
       activation: elu
 
       initializer:
