@@ -348,13 +348,13 @@ class HumanoidAMP(Humanoid):
         B, N = dof_pos.shape[:2]
         dof_pos = dof_pos.reshape(B*N, 4)
         dof_pos = get_euler_xyz(dof_pos)
-        dof_pos = (dof_pos.reshape(B, N, 3)) 
+        dof_pos = dof_pos.reshape(B, N, 3)
 
         dof_pos = torch.cat(( dof_pos[:, 0, [2, 0, 1]], dof_pos[:, 1, 1:2], dof_pos[:, 2, 1:2],
                               dof_pos[:, 3, [2, 0, 1]], dof_pos[:, 4, 1:2], dof_pos[:, 5, 1:2], 
                               dof_pos[:, 6, 1:2],
                               dof_pos[:, 7, [1, 0, 2]], dof_pos[:, 8, 1:2],
-                              dof_pos[:, 9, [1, 0, 2]], dof_pos[:, 1:3],
+                              dof_pos[:, 9, [1, 0, 2]], dof_pos[:, 10, 1:2],
                               ), dim=-1)
         #dof_pos[:, 11] *= 0
         dof_pos += self.default_dof_pos
