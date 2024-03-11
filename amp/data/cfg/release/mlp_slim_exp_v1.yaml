@@ -193,7 +193,7 @@ params:
     disc_coef: 5
     disc_logit_reg: 0.01
     disc_grad_penalty: 1.0
-    disc_reward_scale: 10
+    disc_reward_scale: 4
     disc_weight_decay: 0.0001
     normalize_amp_input: True
 
