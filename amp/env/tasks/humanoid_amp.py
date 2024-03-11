@@ -265,7 +265,7 @@ class HumanoidAMP(Humanoid):
     def _setup_character_props(self, key_bodies):
         super()._setup_character_props(key_bodies)
 
-        self._num_amp_obs_per_step = 29
+        self._num_amp_obs_per_step = 46
 
         if (self._enable_hist_obs):
             self._num_self_obs += self._num_amp_obs_steps * self._num_amp_obs_per_step
@@ -593,7 +593,7 @@ def build_robot_amp_observation(root_pos, root_rot, root_vel, root_ang_vel, dof_
     local_root_ang_vel = torch_utils.my_quat_rotate(heading_rot, root_ang_vel)
     remove_id = [4, 9]
     selected_id = [0, 1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18]
-    obs = torch.cat((root_rot_obs, local_root_vel, local_root_ang_vel, dof_pos[..., selected_id]), dim=-1)
+    obs = torch.cat((root_rot_obs, local_root_vel, local_root_ang_vel, dof_pos[..., selected_id], dof_vel[..., selected_id]), dim=-1)
                     
     return obs
 
