@@ -43,7 +43,7 @@ HACK_MOTION_SYNC = False
 HACK_CONSISTENCY_TEST = False
 HACK_OUTPUT_MOTION = False
 HACK_OUTPUT_MOTION_ALL = False
-SMPL_TO_H1 = [1, 2, 3, 5, 6, 7, 9, 15, 16, 20, 21]
+SMPL_TO_H1 = [1, 2, 3, 5, 6, 7, 9, 14, 16, 19, 21]
 
 
 
@@ -356,14 +356,17 @@ class HumanoidAMP(Humanoid):
                               dof_pos[:, 7, [1, 0, 2]], dof_pos[:, 8, 1:2],
                               dof_pos[:, 9, [1, 0, 2]], dof_pos[:, 10, 1:2],
                               ), dim=-1)
-        #dof_pos[:, 11] *= 0
+        #dof_pos[:, 11:] *= np.pi
         dof_pos += self.default_dof_pos
-        dof_pos[:, 12] += 1 / 2
-        dof_pos[:, 14] += 1/ 2
-        dof_pos[:, 16] -= 1 / 2
-        dof_pos[:, 18] += 1 / 2
+        dof_pos[:, 12] += 1.1
+        dof_pos[:, 14] += 1.1
+        dof_pos[:, 16] -= 1.1
+        dof_pos[:, 18] += 1.1
 
+        # dof_pos[:, 14] += 1/ 2 * np.pi
+        # dof_pos[:, 18] += 1/ 2 * np.pi0
         dof_vel = dof_vel.reshape(B*N, 4)
+
         dof_vel = get_euler_xyz(dof_vel)
         dof_vel = dof_vel.reshape(B, N, 3) 
         dof_vel = torch.cat(( dof_vel[:, 0, [2, 0, 1]], dof_vel[:, 1, 1:2], dof_vel[:, 2, 1:2],
@@ -375,7 +378,6 @@ class HumanoidAMP(Humanoid):
         #dof_pos[:, :10] += self.default_do    
         motion_res["dof_pos"] = dof_pos
         motion_res["dof_vel"] = dof_vel
-        
         return motion_res
 
     def _sample_ref_state(self, env_ids):

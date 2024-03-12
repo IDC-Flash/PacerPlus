@@ -46,9 +46,9 @@ env:
   
   numTrajSamples: 10
   trajSampleTimestep: 0.5
-  speedMin: 0.0
+  speedMin: 0.5
   speedMax: 2.0
-  accelMax: 1.0
+  accelMax: 0.5
   sharpTurnProb: 0.02
   useExtendedTrajectoy: True
   enableTaskObs: True

@@ -482,14 +482,14 @@ class Humanoid(BaseTask):
         self.stiffness = stiffness
         self.damping = damping
 
-        for i in range(self.num_dofs):
-            dof_props_asset['driveMode'][i] = gymapi.DOF_MODE_POS
-            # joint positions offsets and PD gains
-            name = self.dof_names[i]
-            for dof_name in self.stiffness.keys():
-                if dof_name in name:
-                    dof_props_asset['stiffness'][i] = self.stiffness[dof_name]
-                    dof_props_asset['damping'][i] = self.damping[dof_name]
+        # for i in range(self.num_dofs):
+        #     dof_props_asset['driveMode'][i] = gymapi.DOF_MODE_POS
+        #     # joint positions offsets and PD gains
+        #     name = self.dof_names[i]
+        #     for dof_name in self.stiffness.keys():
+        #         if dof_name in name:
+        #             dof_props_asset['stiffness'][i] = self.stiffness[dof_name]
+        #             dof_props_asset['damping'][i] = self.damping[dof_name]
 
 
         # get the names of the feet and the contact bodies  
@@ -775,7 +775,7 @@ class Humanoid(BaseTask):
 
     def pre_physics_step(self, actions):
         #### Hz < 500 use PD control rather than torque control
-        pd_tar = self.default_dof_pos + self._pd_action_scale * actions * (1 / self.control_freq_inv)
+        pd_tar = self.default_dof_pos + self._pd_action_scale * actions 
         pd_tar_tensor = gymtorch.unwrap_tensor(pd_tar)
         self.gym.set_dof_position_target_tensor(self.sim, pd_tar_tensor)
         return
