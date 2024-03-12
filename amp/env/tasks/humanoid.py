@@ -482,14 +482,14 @@ class Humanoid(BaseTask):
         self.stiffness = stiffness
         self.damping = damping
 
-        # for i in range(self.num_dofs):
-        #     dof_props_asset['driveMode'][i] = gymapi.DOF_MODE_POS
-        #     # joint positions offsets and PD gains
-        #     name = self.dof_names[i]
-        #     for dof_name in self.stiffness.keys():
-        #         if dof_name in name:
-        #             dof_props_asset['stiffness'][i] = self.stiffness[dof_name]
-        #             dof_props_asset['damping'][i] = self.damping[dof_name]
+        for i in range(self.num_dofs):
+            dof_props_asset['driveMode'][i] = gymapi.DOF_MODE_POS
+            # joint positions offsets and PD gains
+            name = self.dof_names[i]
+            for dof_name in self.stiffness.keys():
+                if dof_name in name:
+                    dof_props_asset['stiffness'][i] = self.stiffness[dof_name]
+                    dof_props_asset['damping'][i] = self.damping[dof_name]
 
 
         # get the names of the feet and the contact bodies  
