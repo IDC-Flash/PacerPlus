@@ -323,8 +323,8 @@ class HumanoidAMP(Humanoid):
     def _reset_default(self, env_ids):
         self._humanoid_root_states[
             env_ids] = self._initial_humanoid_root_states[env_ids]
-        self._dof_pos[env_ids] = self._initial_dof_pos[env_ids]
-        self._dof_vel[env_ids] = self._initial_dof_vel[env_ids]
+        self.dof_pos[env_ids] = self._initial_dof_pos[env_ids]
+        self.dof_vel[env_ids] = self._initial_dof_vel[env_ids]
         self._reset_default_env_ids = env_ids
         return
 
@@ -515,9 +515,9 @@ class HumanoidAMP(Humanoid):
         self._humanoid_root_states[env_ids, 3:7] = root_rot
         self._humanoid_root_states[env_ids, 7:10] = root_vel
         self._humanoid_root_states[env_ids, 10:13] = root_ang_vel
-        self._dof_pos[env_ids] = dof_pos
-        self._dof_vel[env_ids] = dof_vel
-        self._reset_dof_pos = self._dof_pos[env_ids].clone()
+        self.dof_pos[env_ids] = dof_pos
+        self.dof_vel[env_ids] = dof_vel
+        self._reset_dof_pos = self.dof_pos[env_ids].clone()
 
         if (not rigid_body_pos is None) and (not rigid_body_rot is None):
             self._rigid_body_pos[env_ids] = rigid_body_pos
@@ -538,7 +538,7 @@ class HumanoidAMP(Humanoid):
             # ZL: Hack to get rigidbody pos and rot to be the correct values. Needs to be called after _set_env_state
             env_ids = self._reset_ref_env_ids
             if len(env_ids) > 0:
-                self._dof_pos[env_ids] = self._reset_dof_pos
+                self.dof_pos[env_ids] = self._reset_dof_pos
                 self._state_reset_happened = False
         return
 
@@ -560,8 +560,8 @@ class HumanoidAMP(Humanoid):
             root_rot = self._base_quat.clone()
             root_vel = self._humanoid_root_states[:, 7:10].clone()
             root_ang_vel = self._humanoid_root_states[:, 10:13].clone()
-            dof_pos = self._dof_pos.clone()
-            dof_vel = self._dof_vel.clone()
+            dof_pos = self.dof_pos.clone()
+            dof_vel = self.dof_vel.clone()
             self._curr_amp_obs_buf[:] = build_robot_amp_observation(
                     root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel)
         elif len(env_ids) == 0:
@@ -569,8 +569,8 @@ class HumanoidAMP(Humanoid):
         else:
             root_pos = self._base_pos[env_ids].clone()
             root_rot = self._base_quat[env_ids].clone()
-            dof_pos = self._dof_pos[env_ids].clone()
-            dof_vel = self._dof_vel[env_ids].clone()
+            dof_pos = self.dof_pos[env_ids].clone()
+            dof_vel = self.dof_vel[env_ids].clone()
             root_vel = self._humanoid_root_states[env_ids, 7:10].clone()
             root_ang_vel = self._humanoid_root_states[env_ids, 10:13].clone()
 

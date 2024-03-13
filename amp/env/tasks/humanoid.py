@@ -136,8 +136,8 @@ class Humanoid(BaseTask):
 
         self._dof_state = gymtorch.wrap_tensor(dof_state_tensor)
         dofs_per_env = self._dof_state.shape[0] // self.num_envs
-        self._dof_pos = self._dof_state.view(self.num_envs, dofs_per_env, 2)[..., :self.num_dofs, 0]
-        self._dof_vel = self._dof_state.view(self.num_envs, dofs_per_env, 2)[..., :self.num_dofs, 1]
+        self.dof_pos = self._dof_state.view(self.num_envs, dofs_per_env, 2)[..., :self.num_dofs, 0]
+        self.dof_vel = self._dof_state.view(self.num_envs, dofs_per_env, 2)[..., :self.num_dofs, 1]
 
 
         net_contact_forces_tensor = gymtorch.wrap_tensor(net_contact_forces)
@@ -163,6 +163,8 @@ class Humanoid(BaseTask):
         self.default_dof_pos = torch.zeros(self.num_dofs, dtype=torch.float, device=self.device, requires_grad=False)
         self.gravity_vec = to_torch(get_axis_params(-1., self.up_axis_idx), device=self.device).repeat((self.num_envs, 1))
         self.actions = torch.zeros(self.num_envs, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
+        self.last_actions = torch.zeros(self.num_envs, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
+        self.last_dof_vel = torch.zeros_like(self.dof_vel)
 
         default_joint_angles = { # = target angles [rad] when action = 0.0
            'left_hip_yaw_joint' : 0. ,   
@@ -258,13 +260,39 @@ class Humanoid(BaseTask):
  
 
 
+        class scales:
+            lin_vel_z = -2.0
+            ang_vel_xy = -0.05
+            torques = -0.00001
+            dof_acc = -2.5e-7
+            base_height = -0. 
+            feet_air_time =  1.0
+            collision = -1.
+            action_rate = -0.01
+
+        self.locomotion_reward_scales = {
+            'lin_vel_z': 0.0,
+            'ang_vel_xy': 0.0,
+            'orientation': -1.0,
+            'torques': -0.00001,
+            'dof_acc':  -3.5e-8,
+            'base_height': 0.0,
+            'feet_air_time': 1.0,
+            'collision': 0.0,
+            'action_rate': -0.01,
+            'dof_pos_limits': -10.0}
+        self.num_locomotion_reward = 0
+        for key in self.locomotion_reward_scales.keys():
+            if self.locomotion_reward_scales[key] != 0:
+                self.num_locomotion_reward += 1
+
 
     def _clear_recorded_states(self):
         del self.state_record
         self.state_record = defaultdict(list)
 
     def _record_states(self):
-        self.state_record['dof_pos'].append(self._dof_pos.cpu().clone())
+        self.state_record['dof_pos'].append(self.dof_pos.cpu().clone())
         self.state_record['root_states'].append(self._humanoid_root_states.cpu().clone())
         self.state_record['progress'].append(self.progress_buf.cpu().clone())
 
@@ -392,6 +420,9 @@ class Humanoid(BaseTask):
         self.reset_buf[env_ids] = 0
         self._terminate_buf[env_ids] = 0
         self._contact_forces[env_ids] = 0
+        self.last_actions[env_ids] = 0.
+        self.last_dof_vel[env_ids] = 0.
+        self.feet_air_time[env_ids] = 0.
         return
 
     def _create_ground_plane(self):
@@ -543,6 +574,8 @@ class Humanoid(BaseTask):
         for i in range(len(termination_contact_names)):
             self._termination_contact_body_ids[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.humanoid_handles[0], termination_contact_names[i])
 
+        self.feet_air_time = torch.zeros(self.num_envs, self._contact_body_ids.shape[0], dtype=torch.float, device=self.device, requires_grad=False)
+        self.last_contacts = torch.zeros(self.num_envs, len(self._contact_body_ids), dtype=torch.bool, device=self.device, requires_grad=False)
         return
 
     ################ Callbacks for environment creation from LeggedGym################
@@ -596,7 +629,7 @@ class Humanoid(BaseTask):
                 m = (self.dof_pos_limits[i, 0] + self.dof_pos_limits[i, 1]) / 2
                 r = self.dof_pos_limits[i, 1] - self.dof_pos_limits[i, 0]
                 self.dof_pos_limits[i, 0] = m - 0.5 * r * 0.9
-                self.dof_pos_limits[i, 1] = m + 0.5 * r * 0.98
+                self.dof_pos_limits[i, 1] = m + 0.5 * r * 0.9
             self._pd_action_offset = (self.dof_pos_limits[:, 1] + self.dof_pos_limits[:, 0]) / 2
             self._pd_action_scale = (self.dof_pos_limits[:, 1] - self.dof_pos_limits[:, 0]) / 2
         return props
@@ -654,6 +687,9 @@ class Humanoid(BaseTask):
         self.rew_buf[:] = compute_humanoid_reward(self.obs_buf)
         return
 
+
+
+
     def _compute_reset(self):
         self.reset_buf[:], self._terminate_buf[:] = compute_humanoid_reset(
             self.reset_buf, self.progress_buf, self._contact_forces,
@@ -669,7 +705,7 @@ class Humanoid(BaseTask):
             # ZL: Hack to get rigidbody pos and rot to be the correct values. Needs to be called after _set_env_state
             env_ids = self._reset_ref_env_ids
             if len(env_ids) > 0:
-                self._dof_pos[env_ids] = self.default_dof_pos
+                self.dof_pos[env_ids] = self.default_dof_pos
                 self._state_reset_happened = False
         return
 
@@ -689,15 +725,15 @@ class Humanoid(BaseTask):
             root_rot = self._base_quat.clone()
             root_vel = self._humanoid_root_states[:, 7:10].clone()
             root_ang_vel = self._humanoid_root_states[:, 10:13].clone()
-            dof_pos = self._dof_pos.clone()
-            dof_vel = self._dof_vel.clone()
+            dof_pos = self.dof_pos.clone()
+            dof_vel = self.dof_vel.clone()
             action = self.actions.clone()
             gravity_vec = self.gravity_vec.clone()
         else:
             root_pos = self._base_pos[env_ids].clone()
             root_rot = self._base_quat[env_ids].clone()
-            dof_pos = self._dof_pos[env_ids].clone()
-            dof_vel = self._dof_vel[env_ids].clone()
+            dof_pos = self.dof_pos[env_ids].clone()
+            dof_vel = self.dof_vel[env_ids].clone()
             root_vel = self._humanoid_root_states[env_ids, 7:10].clone()
             root_ang_vel = self._humanoid_root_states[env_ids, 10:13].clone()
             action = self.actions[env_ids].clone()
@@ -724,8 +760,8 @@ class Humanoid(BaseTask):
         Args:
             env_ids (List[int]): Environemnt ids
         """
-        self._dof_pos[env_ids] = self.default_dof_pos
-        self._dof_vel[env_ids] = 0.
+        self.dof_pos[env_ids] = self.default_dof_pos
+        self.dof_vel[env_ids] = 0.
 
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         self.gym.set_dof_state_tensor_indexed(self.sim, gymtorch.unwrap_tensor(self._dof_state), gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
@@ -759,7 +795,7 @@ class Humanoid(BaseTask):
         for _ in range(self.control_freq_inv):
             self.pre_physics_step(self.actions)
             self.gym.simulate(self.sim)
-            self.gym.refresh_dof_state_tensor(self.sim)
+            #self.gym.refresh_dof_state_tensor(self.sim)
 
             # to fix!
             if self.device == 'cpu':
@@ -776,6 +812,7 @@ class Humanoid(BaseTask):
     def pre_physics_step(self, actions):
         #### Hz < 500 use PD control rather than torque control
         pd_tar = self.default_dof_pos + self._pd_action_scale * actions 
+        pd_tar = torch.clamp(pd_tar, self.dof_pos_limits[:, 0], self.dof_pos_limits[:, 1])
         pd_tar_tensor = gymtorch.unwrap_tensor(pd_tar)
         self.gym.set_dof_position_target_tensor(self.sim, pd_tar_tensor)
         return
@@ -796,6 +833,8 @@ class Humanoid(BaseTask):
         if self.viewer and self.debug_viz:
             self._update_debug_viz()
 
+        self.last_actions[:] = self.actions[:]
+        self.last_dof_vel[:] = self.dof_vel[:]
         return
 
     def render(self, sync_frame_time=False):
@@ -841,7 +880,99 @@ class Humanoid(BaseTask):
     def _update_debug_viz(self):
         self.gym.clear_lines(self.viewer)
         return
+    
 
+    #------------ basic reward functions from legged gyms----------------
+    def _reward_lin_vel_z(self):
+        # Penalize z axis base linear velocity
+        return torch.square(self._root_states[:, 9])
+    
+    def _reward_ang_vel_xy(self):
+        # Penalize xy axes base angular velocity
+        return torch.sum(torch.square(self._root_states[:, 10:12]), dim=1)
+    
+    def _reward_orientation(self):
+        # Penalize non flat base orientation
+        heading = torch_utils.calc_heading_quat_inv(self._root_states[:, 3:7])
+        projective_gravity = torch_utils.quat_rotate(heading, self.gravity_vec)
+        return torch.sum(torch.square(projective_gravity[:, :2]), dim=1)
+
+    def _reward_base_height(self):
+        # Penalize base height away from target
+        base_height = self._root_states[:, 2]
+        return torch.square(base_height - 0.98)
+    
+    def _reward_torques(self):
+        # Penalize torques
+        torques = self.p_gains * (self.actions + self.default_dof_pos - self.dof_pos) - self.d_gains * self.dof_vel
+        return torch.sum(torch.square(torques), dim=1)
+
+    def _reward_dof_vel(self):
+        # Penalize dof velocities
+        return torch.sum(torch.square(self.dof_vel), dim=1)
+    
+    def _reward_dof_acc(self):
+        # Penalize dof accelerations
+        return torch.sum(torch.square((self.last_dof_vel - self.dof_vel) / self.dt), dim=1)
+    
+    def _reward_action_rate(self):
+        # Penalize changes in actions
+        return torch.sum(torch.square(self.last_actions - self.actions), dim=1)
+    
+    def _reward_collision(self):
+        # Penalize collisions on selected bodies
+        return torch.sum(1.*(torch.norm(self._contact_forces[:, self._penalised_contact_indices, :], dim=-1) > 0.1), dim=1)
+    
+    
+    def _reward_dof_pos_limits(self):
+        # Penalize dof positions too close to the limit
+        out_of_limits = -(self.dof_pos - self.dof_pos_limits[:, 0]).clip(max=0.) # lower limit
+        out_of_limits += (self.dof_pos - self.dof_pos_limits[:, 1]).clip(min=0.)
+        return torch.sum(out_of_limits, dim=1)
+
+    def _reward_dof_vel_limits(self):
+        # Penalize dof velocities too close to the limit
+        # clip to max error = 1 rad/s per joint to avoid huge penalties
+        return torch.sum((torch.abs(self.dof_vel) - self.dof_vel_limits).clip(min=0., max=1.), dim=1)
+
+    def _reward_torque_limits(self):
+        # penalize torques too close to the limit
+        torques = self.p_gains * (self.actions + self.default_dof_pos - self.dof_pos) - self.d_gains * self.dof_vel
+        return torch.sum((torch.abs(torques) - self.torque_limits).clip(min=0.), dim=1)
+
+
+    def _reward_feet_air_time(self):
+        # Reward long steps
+        # Need to filter the contacts because the contact reporting of PhysX is unreliable on meshes
+        contact = self._contact_forces[:, self._contact_body_ids, 2] > 1.
+        contact_filt = torch.logical_or(contact, self.last_contacts) 
+        self.last_contacts = contact
+        first_contact = (self.feet_air_time > 0.) * contact_filt
+        self.feet_air_time += self.dt
+        rew_airTime = torch.sum((self.feet_air_time - 0.5) * first_contact, dim=1) # reward only on first contact with the ground
+        #rew_airTime *= torch.norm(self.commands[:, :2], dim=1) > 0.1 #no reward for zero command
+        self.feet_air_time *= ~contact_filt
+        return rew_airTime
+    
+    def _reward_stumble(self):
+        # Penalize feet hitting vertical surfaces
+        return torch.any(torch.norm(self._contact_forces[:, self._contact_body_ids, :2], dim=2) >\
+             5 *torch.abs(self._contact_forces[:, self._contact_body_ids, 2]), dim=1)
+        
+
+    def _reward_feet_contact_forces(self):
+        # penalize high contact forces
+        return torch.sum((torch.norm(self._contact_forces[:, self._contact_body_ids, :], dim=-1) -  100).clip(min=0.), dim=1)
+    
+
+    def _build_locomotion_rewards(self):
+        rewards = []
+        for name, scale in self.locomotion_reward_scales.items():
+            name = '_reward_' + name
+            function = getattr(self, name)
+            if scale != 0:
+                rewards.append(function() * scale)
+        return torch.stack(rewards, dim=1)
 
 #####################################################################
 ###=========================jit functions=========================###

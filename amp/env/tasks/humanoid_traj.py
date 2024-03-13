@@ -41,7 +41,7 @@ class HumanoidTraj(humanoid_amp_task.HumanoidAMPTask):
 
         if (not self.headless):
             self._build_marker_state_tensors()
-        self.reward_raw = torch.zeros((self.num_envs)).to(self.device)
+        self.reward_raw = torch.zeros((self.num_envs, 1 + self.num_locomotion_reward)).to(self.device)
         return
 
     def get_task_obs_size(self):
@@ -178,8 +178,11 @@ class HumanoidTraj(humanoid_amp_task.HumanoidAMPTask):
         env_ids = torch.arange(self.num_envs, device=self.device, dtype=torch.long)
         tar_pos = self._traj_gen.calc_pos(env_ids, time)
 
-        self.rew_buf[:] = compute_location_reward(root_pos, tar_pos)
-        self.reward_raw = self.rew_buf.clone().unsqueeze(-1)
+        rew_buf = compute_location_reward(root_pos, tar_pos)
+        locomotion_reward = self._build_locomotion_rewards()
+        self.reward_raw[:, 0] = rew_buf
+        self.reward_raw[:, 1:] = locomotion_reward
+        self.rew_buf = self.reward_raw.sum(dim=-1)
         return
 
     def _compute_reset(self):
