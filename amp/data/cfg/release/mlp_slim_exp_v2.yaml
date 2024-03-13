@@ -46,7 +46,7 @@ env:
   
   numTrajSamples: 10
   trajSampleTimestep: 0.5
-  speedMin: 1.5
+  speedMin: 0
   speedMax: 2.0
   accelMax: 1.0
   sharpTurnProb: 0.02
