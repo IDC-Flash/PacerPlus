@@ -352,7 +352,7 @@ class HumanoidAMP(Humanoid):
 
         dof_pos = torch.cat(( dof_pos[:, 0, [2, 0, 1]], dof_pos[:, 1, 1:2], dof_pos[:, 2, 1:2],
                               dof_pos[:, 3, [2, 0, 1]], dof_pos[:, 4, 1:2], dof_pos[:, 5, 1:2], 
-                              dof_pos[:, 6, 1:2],
+                              dof_pos[:, 6, 2:3],
                               dof_pos[:, 7, [1, 0, 2]], dof_pos[:, 8, 1:2],
                               dof_pos[:, 9, [1, 0, 2]], dof_pos[:, 10, 1:2],
                               ), dim=-1)
@@ -371,7 +371,7 @@ class HumanoidAMP(Humanoid):
         dof_vel = dof_vel.reshape(B, N, 3) 
         dof_vel = torch.cat(( dof_vel[:, 0, [2, 0, 1]], dof_vel[:, 1, 1:2], dof_vel[:, 2, 1:2],
                               dof_vel[:, 3, [2, 0, 1]], dof_vel[:, 4, 1:2], dof_vel[:, 5, 1:2], 
-                              dof_vel[:, 6, 1:2],
+                              dof_vel[:, 6, 2:3],
                               dof_vel[:, 7, [1, 0, 2]], dof_vel[:, 8, 1:2],
                               dof_vel[:, 9,[1, 0, 2]], dof_vel[:, 10, 1:2],
                               ), dim=-1)
