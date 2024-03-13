@@ -259,17 +259,6 @@ class Humanoid(BaseTask):
         self._dof_names = self._body_names[1:]
  
 
-
-        class scales:
-            lin_vel_z = -2.0
-            ang_vel_xy = -0.05
-            torques = -0.00001
-            dof_acc = -2.5e-7
-            base_height = -0. 
-            feet_air_time =  1.0
-            collision = -1.
-            action_rate = -0.01
-
         self.locomotion_reward_scales = {
             'lin_vel_z': 0.0,
             'ang_vel_xy': 0.0,
@@ -277,7 +266,7 @@ class Humanoid(BaseTask):
             'torques': -0.00001,
             'dof_acc':  -3.5e-8,
             'base_height': 0.0,
-            'feet_air_time': 1.0,
+            'feet_air_time': 0.0,
             'collision': 0.0,
             'action_rate': -0.01,
             'dof_pos_limits': -10.0}
@@ -893,8 +882,8 @@ class Humanoid(BaseTask):
     
     def _reward_orientation(self):
         # Penalize non flat base orientation
-        heading = torch_utils.calc_heading_quat_inv(self._root_states[:, 3:7])
-        projective_gravity = torch_utils.quat_rotate(heading, self.gravity_vec)
+        heading = torch_utils.calc_heading_quat_inv(self._humanoid_root_states[:, 3:7])
+        projective_gravity = torch_utils.quat_rotate(heading, self.gravity_vec[:self.num_envs])
         return torch.sum(torch.square(projective_gravity[:, :2]), dim=1)
 
     def _reward_base_height(self):
