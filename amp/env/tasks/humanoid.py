@@ -303,7 +303,7 @@ class Humanoid(BaseTask):
         split_idx[:, 1] += 1
         dof_pos_all =  torch.stack(self.state_record['dof_pos'])
         root_states_all =  torch.stack(self.state_record['root_states'])
-        fps = 60
+        fps = 30
         motion_dict_dump = {}
         num_for_this_humanoid = 0
         curr_humanoid_index = 0

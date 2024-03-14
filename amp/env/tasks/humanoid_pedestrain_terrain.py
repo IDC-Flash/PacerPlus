@@ -31,10 +31,10 @@ class HumanoidPedestrianTerrain(humanoid_traj.HumanoidTraj):
                  headless):
         ## ZL Hack to get the height map to load.
         self.cfg = cfg
+        self._has_upright_start = cfg['env'].get("uprightStart", True)
         self.real_mesh = cfg['args'].real_mesh
-        self.load_smpl_configs(cfg)
-        self._num_joints = len(self._body_names)
         self.num_envs = cfg["env"]["numEnvs"]
+        self.velocity_map = cfg["env"].get("velocity_map", False)
         self.device_type = cfg.get("device_type", "cuda")
         self.device_id = cfg.get("device_id", 0)
         self.headless = cfg["headless"]
@@ -76,15 +76,14 @@ class HumanoidPedestrianTerrain(humanoid_traj.HumanoidTraj):
                          device_id=device_id,
                          headless=headless)
 
-        self.reward_raw = torch.zeros((self.num_envs, 2)).to(self.device)
 
         if (not self.headless) and self.show_sensors:
             self._build_sensor_state_tensors()
-
+        self.reward_raw = torch.zeros((self.num_envs, 1 + self.num_locomotion_reward)).to(self.device)
         return
 
-    def _build_env(self, env_id, env_ptr, humanoid_asset):
-        super()._build_env(env_id, env_ptr, humanoid_asset)
+    def _build_env(self, env_id, env_ptr, humanoid_asset, dof_props_asset, rigid_shape_props_asset):
+        super()._build_env(env_id, env_ptr, humanoid_asset, dof_props_asset, rigid_shape_props_asset)
 
         if (not self.headless) and self.show_sensors:
             self._load_sensor_asset()
@@ -244,61 +243,10 @@ class HumanoidPedestrianTerrain(humanoid_traj.HumanoidTraj):
         else:
             return head_pose[env_ids]
 
-    # # ZL: Dev purposes only, will remove.
-    # def _fetch_traj_samples(self, env_ids=None):
-    #     # 5 seconds with 0.5 second intervals, 10 samples.
-    #     if (env_ids is None):
-    #         env_ids = torch.arange(self.num_envs,
-    #                                device=self.device,
-    #                                dtype=torch.long)
-
-    #     timestep_beg = self.progress_buf[env_ids] * self.dt
-    #     timesteps = torch.arange(self._num_traj_samples,
-    #                              device=self.device,
-    #                              dtype=torch.float)
-    #     timesteps = timesteps * self._traj_sample_timestep
-    #     traj_timesteps = timestep_beg.unsqueeze(-1) + timesteps
-
-    #     env_ids_tiled = torch.broadcast_to(env_ids.unsqueeze(-1),
-    #                                        traj_timesteps.shape)
-
-    #     traj_samples_flat = self._traj_gen.calc_pos(env_ids_tiled.flatten(),
-    #                                                 traj_timesteps.flatten())
-    #     traj_samples = torch.reshape(traj_samples_flat,
-    #                                  shape=(env_ids.shape[0],
-    #                                         self._num_traj_samples,
-    #                                         traj_samples_flat.shape[-1]))
-
-    #     traj_samples_flat = self._traj_gen.mock_calc_pos(env_ids, env_ids_tiled.flatten(), traj_timesteps.flatten(), self.query_value_gradient)
-
-    #     return traj_samples
 
     def update_value_func(self, eval_value_func, actor_func):
         self.eval_value_func = eval_value_func
         self.actor_func = actor_func
-
-    def query_value_gradient(self, env_ids, new_traj):
-        # new_traj would be the same as self._fetch_traj_samples(env_ids)
-        # return callable value function and update_obs (processed with mean and std)
-        # value_func(obs)
-        # new_traj of shape (num_envs, 10, 3)
-        # TODO: implement this
-        if "eval_value_func" in self.__dict__:
-            sim_obs_size = self.get_self_obs_size()
-            task_obs_detal = self.get_task_obs_size_detail()
-            assert(task_obs_detal[0][0] == "traj")
-
-            if (env_ids is None):
-                root_states = self._humanoid_root_states
-            else:
-                root_states = self._humanoid_root_states[env_ids]
-
-            new_traj_obs = compute_location_observations(root_states, new_traj.view(env_ids.shape[0], 10, -1), self._has_upright_start)
-            buffered_obs = self.obs_buf[env_ids].clone()
-            buffered_obs[:, sim_obs_size:(task_obs_detal[0][1] + sim_obs_size)] = new_traj_obs
-
-            return buffered_obs, self.eval_value_func
-        return None, None
 
     def live_plotter(self, img,  identifier='', pause_time=0.00000001):
         if not hasattr(self, 'imshow_obj'):
@@ -491,15 +439,13 @@ class HumanoidPedestrianTerrain(humanoid_traj.HumanoidTraj):
                 False
             ), "Unsupported state initialization strategy: {:s}".format(
                 str(self._state_init))
+            
 
-        if self.smpl_humanoid:
-            curr_gender_betas = self.humanoid_betas[env_ids]
-            root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot, body_vel, body_ang_vel = self._get_fixed_smpl_state_from_motionlib(
-                motion_ids, motion_times, curr_gender_betas)
-        else:
-            root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos = self._motion_lib.get_motion_state(
-                motion_ids, motion_times)
-            rb_pos, rb_rot = None, None
+        motion_res = self._get_smpl_state_from_motionlib_cache(motion_ids, motion_times)
+
+        root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, smpl_params, limb_weights, pose_aa, rb_pos, rb_rot, body_vel, body_ang_vel = \
+                motion_res["root_pos"], motion_res["root_rot"], motion_res["dof_pos"], motion_res["root_vel"], motion_res["root_ang_vel"], motion_res["dof_vel"], \
+                motion_res["key_pos"], motion_res["motion_bodies"], motion_res["motion_limb_weights"], motion_res["motion_aa"], motion_res["rg_pos"], motion_res["rb_rot"], motion_res["body_vel"], motion_res["body_ang_vel"]
 
 
         if flags.random_heading:
@@ -514,8 +460,6 @@ class HumanoidPedestrianTerrain(humanoid_traj.HumanoidTraj):
             root_ang_vel = quat_apply(random_heading_quat, root_ang_vel).clone()
 
             curr_heading = torch_utils.calc_heading_quat(root_rot)
-
-
             root_vel[:, 0] = torch.rand([num_envs]) * vel_range + vel_min
             root_vel = quat_apply(curr_heading, root_vel).clone()
 
@@ -526,12 +470,8 @@ class HumanoidPedestrianTerrain(humanoid_traj.HumanoidTraj):
         motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot = self._sample_ref_state(env_ids)
         ## Randomrized location setting
         new_root_xy = self.terrain.sample_valid_locations(self.num_envs, env_ids)
-        # joblib.dump(self.terrain.sample_valid_locations(100000, torch.arange(100000)).detach().cpu(), "new_root_xy.pkl")
-        # import ipdb; ipdb.set_trace()
 
         if flags.fixed:
-
-
             new_root_xy[:, 0], new_root_xy[:, 1] = 10 + env_ids * 3, 10
 
 
@@ -539,21 +479,18 @@ class HumanoidPedestrianTerrain(humanoid_traj.HumanoidTraj):
             new_traj = self._traj_gen.input_new_trajs(env_ids)
             new_root_xy[:, 0], new_root_xy[:, 1] = new_traj[:, 0, 0], new_traj[:, 0,  1]
 
-
-
         diff_xy = new_root_xy - root_pos[:, 0:2]
         root_pos[:, 0:2] = new_root_xy
-
         root_states = torch.cat([root_pos, root_rot], dim=1)
 
         center_height = self.get_center_heights(root_states, env_ids=env_ids).mean(dim=-1)
 
         root_pos[:, 2] += center_height
-        key_pos[..., 0:2] += diff_xy[:, None, :]
-        key_pos[...,  2] += center_height[:, None]
+        # key_pos[..., 0:2] += diff_xy[:, None, :]
+        # key_pos[...,  2] += center_height[:, None]
 
-        rb_pos[..., 0:2] += diff_xy[:, None, :]
-        rb_pos[..., 2] += center_height[:, None]
+        # rb_pos[..., 0:2] += diff_xy[:, None, :]
+        # rb_pos[..., 2] += center_height[:, None]
 
         self._set_env_state(env_ids=env_ids,
                             root_pos=root_pos,
@@ -561,13 +498,13 @@ class HumanoidPedestrianTerrain(humanoid_traj.HumanoidTraj):
                             dof_pos=dof_pos,
                             root_vel=root_vel,
                             root_ang_vel=root_ang_vel,
-                            dof_vel=dof_vel,
-                            rigid_body_pos=rb_pos,
-                            rigid_body_rot=rb_rot)
+                            dof_vel=dof_vel)
 
         self._reset_ref_env_ids = env_ids
         self._reset_ref_motion_ids = motion_ids
         self._reset_ref_motion_times = motion_times
+        self._motion_start_times[env_ids] = motion_times
+        self._sampled_motion_ids[env_ids] = motion_ids
         if flags.follow:
             self.start = True  ## Updating camera when reset
 
@@ -682,7 +619,7 @@ class HumanoidPedestrianTerrain(humanoid_traj.HumanoidTraj):
         elif self.cfg["env"]["terrain"]["terrainType"] == 'none':
             raise NameError("Can't measure height with terrain type 'none'")
 
-        if self.smpl_humanoid and not self._has_upright_start:
+        if  not self._has_upright_start:
             base_quat = remove_base_rot(base_quat)
 
         if env_ids is None:
@@ -711,7 +648,7 @@ class HumanoidPedestrianTerrain(humanoid_traj.HumanoidTraj):
         elif self.cfg["env"]["terrain"]["terrainType"] == 'none':
             raise NameError("Can't measure height with terrain type 'none'")
 
-        if self.smpl_humanoid and not self._has_upright_start:
+        if  not self._has_upright_start:
             base_quat = remove_base_rot(base_quat)
 
         heading_rot = torch_utils.calc_heading_quat(base_quat)
@@ -839,63 +776,12 @@ class HumanoidPedestrianTerrain(humanoid_traj.HumanoidTraj):
 
 
 
-
-        # plane_params = gymapi.PlaneParams()
-        # plane_params.normal = gymapi.Vec3(0.0, 0.0, 1.0)
-        # plane_params.distance = 0
-        # plane_params.static_friction = self.plane_static_friction
-        # plane_params.dynamic_friction = self.plane_dynamic_friction
-        # plane_params.restitution = self.plane_restitution
-        # self.gym.add_ground(self.sim, plane_params)
-        # print("using plain ground");print("using plain ground");print("using plain ground");print("using plain ground");print("using plain ground");
-
     def _compute_reset(self):
-        time = self.progress_buf * self.dt
-        env_ids = torch.arange(self.num_envs,
-                               device=self.device,
-                               dtype=torch.long)
-        tar_pos = self._traj_gen.calc_pos(env_ids, time)
-        ### ZL: entry point
-        # self._traj_gen.update_sim_pos(self._humanoid_root_states[)
-
-        root_states = self._humanoid_root_states
-        center_height = self.get_center_heights(
-            root_states, env_ids=None).mean(dim=-1, keepdim=True)
-
-        # import ipdb
-        # ipdb.set_trace()
-        # plotter_names = ("left_ankle", "left_toe", "right_ankle", "right_toe")
-        # plot_all = self._contact_forces[0, [3, 4, 7, 8], 2] / 1000
-        # plotter_names = ("left_ankle", "right_ankle")
-        # plot_all = torch.norm(self._contact_forces[0, [3, 7], :], dim=-1) / 2000
-        # self.contact_force_plotters(plot_all.cpu().numpy(), plotter_names)
-
-        self.reset_buf[:], self._terminate_buf[:] = compute_humanoid_reset(
-            self.reset_buf, self.progress_buf, self._contact_forces,
-            self._contact_body_ids, center_height, self._rigid_body_pos,
-            tar_pos, self.max_episode_length, self._fail_dist,
-            self._enable_early_termination, self._termination_heights, flags.no_collision_check)
+        super()._compute_reset()
         return
 
     def _compute_reward(self, actions):
-        root_pos = self._humanoid_root_states[..., 0:3]
-
-        time = self.progress_buf * self.dt
-        env_ids = torch.arange(self.num_envs, device=self.device, dtype=torch.long)
-        tar_pos = self._traj_gen.calc_pos(env_ids, time)
-
-        location_reward = compute_location_reward(root_pos, tar_pos)
-
-        power = torch.abs(torch.multiply(self.dof_force_tensor, self._dof_vel)).sum(dim = -1)
-        # power_reward = -0.00005 * (power ** 2)
-        power_reward = -self.power_coefficient * power
-
-        if self.power_reward:
-            self.rew_buf[:] = location_reward + power_reward
-        else:
-            self.rew_buf[:] = location_reward
-        self.reward_raw[:] = torch.cat([location_reward[:, None], power_reward[:, None]], dim = -1)
-
+        super()._compute_reward(actions)
         return
 
 
@@ -1469,108 +1355,6 @@ class Terrain:
         self.walkable_field_raw = ndimage.binary_dilation(self.walkable_field_raw, iterations=3).astype(int)
 
 
-
-
-@torch.jit.script
-def compute_humanoid_reset(reset_buf, progress_buf, contact_buf,
-                           contact_body_ids, center_height, rigid_body_pos,
-                           tar_pos, max_episode_length, fail_dist,
-                           enable_early_termination, termination_heights, disableCollision):
-    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, float, float, bool, Tensor, bool) -> Tuple[Tensor, Tensor]
-    terminated = torch.zeros_like(reset_buf)
-
-    if (enable_early_termination):
-        masked_contact_buf = contact_buf.clone()
-        masked_contact_buf[:, contact_body_ids, :] = 0
-        ## torch.sum to disable self-collision.
-        # force_threshold = 200
-        force_threshold = 50
-        body_contact_force = torch.sqrt(torch.square(torch.abs(masked_contact_buf.sum(dim=-2))).sum(dim=-1)) > force_threshold
-
-        # body_height = rigid_body_pos[..., 2]
-        # body_height -= center_height
-
-        # fall_height = body_height < termination_heights
-        # fall_height[:, contact_body_ids] = False
-        # fall_height = torch.any(fall_height, dim=-1)
-
-        # has_fallen = torch.logical_and(body_contact_force, fall_height)
-        has_fallen = body_contact_force
-        # first timestep can sometimes still have nonzero contact forces
-        # so only check after first couple of steps
-        has_fallen *= (progress_buf > 1)
-
-        root_pos = rigid_body_pos[..., 0, :]
-        tar_delta = tar_pos[..., 0:2] - root_pos[...,0:2]  # also reset if toooo far away from the target trajectory
-        tar_dist_sq = torch.sum(tar_delta * tar_delta, dim=-1)
-        tar_fail = tar_dist_sq > fail_dist * fail_dist
-
-        has_failed = torch.logical_or(has_fallen, tar_fail)
-        # if has_fallen.any():
-        #     import ipdb
-        #     ipdb.set_trace()
-
-        if disableCollision:
-            has_failed[:] = False
-
-        ############################## Debug ##############################
-        # if torch.sum(has_fallen) > 0:
-        #     import ipdb; ipdb.set_trace()
-        #     print("???")
-        # mujoco_joint_names = np.array(['Pelvis', 'L_Hip', 'L_Knee', 'L_Ankle', 'L_Toe', 'R_Hip', 'R_Knee', 'R_Ankle', 'R_Toe', 'Torso', 'Spine', 'Chest', 'Neck', 'Head', 'L_Thorax', 'L_Shoulder', 'L_Elbow', 'L_Wrist', 'L_Hand', 'R_Thorax', 'R_Shoulder', 'R_Elbow', 'R_Wrist', 'R_Hand'])
-        # print( mujoco_joint_names[masked_contact_buf[0, :, 0].nonzero().cpu().numpy()])
-        ############################## Debug ##############################
-
-
-        # has_failed[:] = False
-
-        terminated = torch.where(has_failed, torch.ones_like(reset_buf), terminated)
-
-
-        # if torch.sum(terminated) > 0:
-        #     termianted_progress = progress_buf[torch.where(terminated)]
-        #     print(torch.where(termianted_progress < 30), termianted_progress[termianted_progress < 30])
-
-    reset = torch.where(progress_buf >= max_episode_length, torch.ones_like(reset_buf), terminated)
-
-    return reset, terminated
-
-# @torch.jit.script
-# def compute_humanoid_reset(reset_buf, progress_buf, contact_buf, contact_body_ids, center_height, rigid_body_pos,
-#                            tar_pos, max_episode_length, fail_dist,
-#                            enable_early_termination, termination_heights):
-#     # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, float, float, bool, Tensor) -> Tuple[Tensor, Tensor]
-#     # print("using plain reset")
-#     terminated = torch.zeros_like(reset_buf)
-
-#     if (enable_early_termination):
-#         masked_contact_buf = contact_buf.clone()
-#         masked_contact_buf[:, contact_body_ids, :] = 0
-#         fall_contact = torch.any(torch.abs(masked_contact_buf) > 0.1, dim=-1)
-#         fall_contact = torch.any(fall_contact, dim=-1)
-
-#         body_height = rigid_body_pos[..., 2]
-#         fall_height = body_height < termination_heights
-#         fall_height[:, contact_body_ids] = False
-#         fall_height = torch.any(fall_height, dim=-1)
-
-#         has_fallen = torch.logical_and(fall_contact, fall_height)
-#         # first timestep can sometimes still have nonzero contact forces
-#         # so only check after first couple of steps
-#         has_fallen *= (progress_buf > 1)
-
-#         root_pos = rigid_body_pos[..., 0, :]
-#         tar_delta = tar_pos[..., 0:2] - root_pos[..., 0:2]
-#         tar_dist_sq = torch.sum(tar_delta * tar_delta, dim=-1)
-#         tar_fail = tar_dist_sq > fail_dist * fail_dist
-
-#         has_failed = torch.logical_or(has_fallen, tar_fail)
-
-#         terminated = torch.where(has_failed, torch.ones_like(reset_buf), terminated)
-
-#     reset = torch.where(progress_buf >= max_episode_length - 1, torch.ones_like(reset_buf), terminated)
-
-#     return reset, terminated
 
 
 @torch.jit.script
