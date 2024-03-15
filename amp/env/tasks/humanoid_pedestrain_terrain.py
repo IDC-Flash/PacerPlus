@@ -145,20 +145,11 @@ class HumanoidPedestrianTerrain(humanoid_traj.HumanoidTraj):
 
         if (not self.headless) and self.show_sensors:
             self._sensor_pos[:] = points
-        # self._sensor_pos[..., 2] += 0.3
-        # self._sensor_pos[..., 2] -= 5
 
         traj_samples = self._fetch_traj_samples()
-
         self._marker_pos[:] = traj_samples
         self._marker_pos[..., 2] = self._humanoid_root_states[..., 2:3]  # jp hack # ZL hack
-        # self._marker_pos[..., 2] = 0.89
-        # self._marker_pos[..., 2] = 0
 
-        # if (not self.headless) and self.show_sensors:
-        #     comb_idx = torch.cat([self._sensor_actor_ids, self._marker_actor_ids])
-        # else:
-        #     comb_idx = torch.cat([self._marker_actor_ids])
         comb_idx = torch.cat([self._traj_marker_actor_ids])
 
         if flags.show_traj:
@@ -229,15 +220,12 @@ class HumanoidPedestrianTerrain(humanoid_traj.HumanoidTraj):
 
 
     def get_head_pose(self, env_ids=None):
-        if self.smpl_humanoid:
-            head_idx = self._body_names.index("Head")
-        else:
-            head_idx = 2
-        head_pose = torch.cat([
-            self._rigid_body_pos[:, head_idx], self._rigid_body_rot[:,
-                                                                    head_idx]
-        ],
-                              dim=1)
+        # if self.smpl_humanoid:
+        #     head_idx = self._body_names.index("Head")
+        # else:
+        #     head_idx = 2
+        head_idx = 0
+        head_pose = self._humanoid_root_states
         if (env_ids is None):
             return head_pose
         else:
@@ -485,12 +473,8 @@ class HumanoidPedestrianTerrain(humanoid_traj.HumanoidTraj):
 
         center_height = self.get_center_heights(root_states, env_ids=env_ids).mean(dim=-1)
 
-        root_pos[:, 2] += center_height
-        # key_pos[..., 0:2] += diff_xy[:, None, :]
-        # key_pos[...,  2] += center_height[:, None]
+        root_pos[:, 2] += center_height+0.2
 
-        # rb_pos[..., 0:2] += diff_xy[:, None, :]
-        # rb_pos[..., 2] += center_height[:, None]
 
         self._set_env_state(env_ids=env_ids,
                             root_pos=root_pos,
