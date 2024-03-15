@@ -135,7 +135,7 @@ params:
         learn_sigma: False
 
     mlp:
-      units: [512, 256]
+      units: [1024, 512]
       activation: elu
       d2rl: False
       
@@ -145,7 +145,7 @@ params:
         name: None
 
     disc:
-      units: [512, 256]
+      units: [1024, 512]
       activation: elu
 
       initializer:
