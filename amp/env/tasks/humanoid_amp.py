@@ -411,6 +411,12 @@ class HumanoidAMP(Humanoid):
             x_grid, y_grid = torch.meshgrid(torch.arange(64), torch.arange(64))
             root_pos[:, 0], root_pos[:, 1] = x_grid.flatten()[env_ids] * 2, y_grid.flatten()[env_ids] * 2
 
+        root_pos[:, 0] += 10
+        root_pos[:, 1] += 10
+        root_pos[:, 2] += 0.1
+        if flags.test:
+            dof_pos = self.default_dof_pos
+
         self._set_env_state(env_ids=env_ids,
                             root_pos=root_pos,
                             root_rot=root_rot,

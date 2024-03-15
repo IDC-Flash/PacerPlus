@@ -473,7 +473,7 @@ class HumanoidPedestrianTerrain(humanoid_traj.HumanoidTraj):
 
         center_height = self.get_center_heights(root_states, env_ids=env_ids).mean(dim=-1)
 
-        root_pos[:, 2] += center_height+0.2
+        root_pos[:, 2] += center_height+0.1
 
 
         self._set_env_state(env_ids=env_ids,

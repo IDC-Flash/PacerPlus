@@ -525,7 +525,11 @@ class Humanoid(BaseTask):
 
         actuator_props = self.gym.get_asset_actuator_properties(
             robot_asset)
-
+        
+        sensor_options = gymapi.ForceSensorProperties()
+        sensor_options.enable_forward_dynamics_forces = False # for example gravity
+        sensor_options.enable_constraint_solver_forces = True # for example contacts
+        sensor_options.use_world_frame = True
         # create force sensors at the feet
         right_foot_idx = self.gym.find_asset_rigid_body_index(
             robot_asset, "right_ankle")
@@ -533,10 +537,8 @@ class Humanoid(BaseTask):
             robot_asset, "left_ankle")
         sensor_pose = gymapi.Transform()
 
-        self.gym.create_asset_force_sensor(robot_asset,
-                                            right_foot_idx, sensor_pose)
-        self.gym.create_asset_force_sensor(robot_asset,
-                                            left_foot_idx, sensor_pose)
+        self.gym.create_asset_force_sensor(robot_asset, right_foot_idx, sensor_pose, sensor_options)
+        self.gym.create_asset_force_sensor(robot_asset, left_foot_idx, sensor_pose,sensor_options)
         self.robot_assets = [robot_asset] * num_envs
  
         self.torso_index = 0
@@ -553,6 +555,7 @@ class Humanoid(BaseTask):
 
         self._contact_body_ids = torch.zeros(len(feet_names), dtype=torch.long, device=self.device, requires_grad=False)
         for i in range(len(feet_names)):
+            
             self._contact_body_ids[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.humanoid_handles[0], feet_names[i])
 
         self._penalised_contact_indices = torch.zeros(len(penalized_contact_names), dtype=torch.long, device=self.device, requires_grad=False)

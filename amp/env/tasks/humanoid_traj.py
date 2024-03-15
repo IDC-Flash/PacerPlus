@@ -228,6 +228,8 @@ class HumanoidTraj(humanoid_amp_task.HumanoidAMPTask):
             self.gym.add_lines(self.viewer, env_ptr, lines.shape[0], lines, curr_cols)
 
         return
+    
+
 
 
 #####################################################################
@@ -299,3 +301,4 @@ def compute_humanoid_reset(reset_buf, progress_buf, contact_buf,
     # ipdb.set_trace()
 
     return reset, terminated
+
