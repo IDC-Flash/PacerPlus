@@ -266,7 +266,7 @@ class Humanoid(BaseTask):
             'torques': -0.00001,
             'dof_acc':  -3.5e-8,
             'base_height': 0.0,
-            'feet_air_time': 0.0,
+            'feet_air_time': 1.0,
             'collision': 0.0,
             'action_rate': -0.01,
             'dof_pos_limits': -10.0}
