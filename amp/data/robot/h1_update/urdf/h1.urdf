@@ -17,7 +17,6 @@ Stephen Brawner (brawner@gmail.com)
     <child link="pelvis" />
   </joint> -->
 
-
   <link
     name="pelvis">
     <inertial>
@@ -49,12 +48,9 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <collision>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
+      <origin xyz="0 0 -0.04" rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="../meshes/pelvis.STL" />
+        <box size="0.15 0.31 0.06"/>
       </geometry>
     </collision>
   </link>
@@ -88,13 +84,10 @@ Stephen Brawner (brawner@gmail.com)
           rgba="0.1 0.1 0.1 1" />
       </material>
     </visual>
-    <!-- [CAUTION] use cylinder for hip_yaw_link -->
     <collision>
-      <origin
-        xyz="-0.067 0 0"
-        rpy="0 1.57075 0" />
+      <origin xyz="0 0 0" rpy="0 1.5707963267948966192313216916398 0" />
       <geometry>
-        <cylinder length="0.07" radius="0.06" />
+        <cylinder radius="0.07" length="0.2"/>
       </geometry>
     </collision>
   </link>
@@ -147,12 +140,9 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <collision>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
+      <origin xyz="0 0.06 0" rpy="1.5707963267948966192313216916398 0 0" />
       <geometry>
-        <mesh
-          filename="../meshes/left_hip_roll_link.STL" />
+        <cylinder radius="0.02" length="0.01"/>
       </geometry>
     </collision>
   </link>
@@ -205,12 +195,16 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <collision>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
+      <origin xyz="0 0 0" rpy="1.5707963267948966192313216916398 0 0" />
       <geometry>
-        <mesh
-          filename="../meshes/left_hip_pitch_link.STL" />
+        <cylinder radius="0.07" length="0.08"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.02 0 -0.2" rpy="0 0 0" />
+      <geometry>
+        <!-- <cylinder radius="0.04" length="0.5"/> -->
+        <box size="0.08 0.08 0.45"/>
       </geometry>
     </collision>
   </link>
@@ -227,8 +221,8 @@ Stephen Brawner (brawner@gmail.com)
     <axis
       xyz="0 1 0" />
     <limit
-      lower="-1.57"
-      upper="1.57"
+      lower="-3.14"
+      upper="2.53"
       effort="200"
       velocity="23" />
   </joint>
@@ -263,12 +257,16 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <collision>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
+      <origin xyz="0.02 0 -0.23" rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="../meshes/left_knee_link.STL" />
+        <!-- <cylinder radius="0.05" length="0.2"/> -->
+        <box size="0.06 0.05 0.37"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.017 0 -0.11" rpy="1.57 0 0" />
+      <geometry>
+        <cylinder radius="0.05" length="0.1"/>
       </geometry>
     </collision>
   </link>
@@ -321,9 +319,9 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <collision>
-      <origin xyz="0.05 0.0 -0.05" rpy="0 0 0" />
+      <origin xyz="0.05 0.0 -0.053" rpy="0 0 0" />
       <geometry>
-        <box size="0.28 0.03 0.024"/>
+        <box size="0.29 0.03 0.026"/>
       </geometry>
     </collision>
   </link>
@@ -375,13 +373,10 @@ Stephen Brawner (brawner@gmail.com)
           rgba="0.1 0.1 0.1 1" />
       </material>
     </visual>
-    <!-- [CAUTION] use cylinder for hip_yaw_link -->
     <collision>
-      <origin
-        xyz="-0.067 0 0"
-        rpy="0 1.57075 0" />
+      <origin xyz="0 0 0" rpy="0 1.5707963267948966192313216916398 0" />
       <geometry>
-        <cylinder length="0.07" radius="0.06" />
+        <cylinder radius="0.07" length="0.2"/>
       </geometry>
     </collision>
   </link>
@@ -434,12 +429,9 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <collision>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
+      <origin xyz="0 -0.06 0" rpy="1.5707963267948966192313216916398 0 0" />
       <geometry>
-        <mesh
-          filename="../meshes/right_hip_roll_link.STL" />
+        <cylinder radius="0.02" length="0.01"/>
       </geometry>
     </collision>
   </link>
@@ -492,12 +484,16 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <collision>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
+      <origin xyz="0 0 0" rpy="1.5707963267948966192313216916398 0 0" />
       <geometry>
-        <mesh
-          filename="../meshes/right_hip_pitch_link.STL" />
+        <cylinder radius="0.07" length="0.08"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.02 0 -0.2" rpy="0 0 0" />
+      <geometry>
+        <!-- <cylinder radius="0.04" length="0.5"/> -->
+        <box size="0.08 0.08 0.45"/>
       </geometry>
     </collision>
   </link>
@@ -514,8 +510,8 @@ Stephen Brawner (brawner@gmail.com)
     <axis
       xyz="0 1 0" />
     <limit
-      lower="-1.57"
-      upper="1.57"
+      lower="-3.14"
+      upper="2.53"
       effort="200"
       velocity="23" />
   </joint>
@@ -550,12 +546,16 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <collision>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
+      <origin xyz="0.02 0 -0.23" rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="../meshes/right_knee_link.STL" />
+        <!-- <cylinder radius="0.05" length="0.2"/> -->
+        <box size="0.06 0.05 0.37"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.017 0 -0.11" rpy="1.57 0 0" />
+      <geometry>
+        <cylinder radius="0.05" length="0.1"/>
       </geometry>
     </collision>
   </link>
@@ -608,9 +608,9 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <collision>
-      <origin xyz="0.05 0.0 -0.05" rpy="0 0 0" />
+      <origin xyz="0.05 0.0 -0.053" rpy="0 0 0" />
       <geometry>
-        <box size="0.28 0.03 0.024"/>
+        <box size="0.29 0.03 0.026"/>
       </geometry>
     </collision>
   </link>
@@ -663,12 +663,21 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <collision>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
+      <origin xyz="0.05 0 0.65" rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="../meshes/torso_link.STL" />
+        <box size="0.17 0.15 0.21"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.0 0.0 0.4" rpy="0 0 0" />
+      <geometry>
+        <box size="0.12 0.3 0.14"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0 0 0.25" rpy="0 0 0" />
+      <geometry>
+        <box size="0.17 0.22 0.47"/>
       </geometry>
     </collision>
   </link>
@@ -721,12 +730,9 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <collision>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
+      <origin xyz="0 -0.05  0" rpy="1.5707963267948966192313216916398 0 0" />
       <geometry>
-        <mesh
-          filename="../meshes/left_shoulder_pitch_link.STL" />
+        <cylinder radius="0.03" length="0.04"/>
       </geometry>
     </collision>
   </link>
@@ -779,12 +785,9 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <collision>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
+      <origin xyz="0 0 -0.06" rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="../meshes/left_shoulder_roll_link.STL" />
+        <cylinder radius="0.05" length="0.15"/>
       </geometry>
     </collision>
   </link>
@@ -837,12 +840,9 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <collision>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
+      <origin xyz="0 0 -0.1" rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="../meshes/left_shoulder_yaw_link.STL" />
+        <cylinder radius="0.04" length="0.18"/>
       </geometry>
     </collision>
   </link>
@@ -868,10 +868,10 @@ Stephen Brawner (brawner@gmail.com)
     name="left_elbow_link">
     <inertial>
       <origin
-        xyz="0.15908 -0.000144 -0.015776"
+        xyz="0.164862 0.000118 -0.015734"
         rpy="0 0 0" />
       <mass
-        value="0.669" />
+        value="0.723" />
       <inertia
         ixx="0.00042388"
         ixy="-3.6086E-05"
@@ -895,12 +895,9 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <collision>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
+      <origin xyz="0.15 0 -0.018" rpy="0 1.57 0" />
       <geometry>
-        <mesh
-          filename="../meshes/left_elbow_link.STL" />
+        <cylinder radius="0.035" length="0.24"/>
       </geometry>
     </collision>
   </link>
@@ -921,6 +918,64 @@ Stephen Brawner (brawner@gmail.com)
       upper="2.61"
       effort="18"
       velocity="20" />
+  </joint>
+    <link
+    name="left_hand_link">
+    <inertial>
+      <origin
+        xyz="0.003993 -0.000094 0"
+        rpy="0 0 0" />
+      <mass
+        value="0.014" />
+      <inertia
+        ixx="0.000003449"
+        ixy="0.000000006"
+        ixz="0"
+        iyy="0.000001917"
+        iyz="0"
+        izz="0.000001932" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/left_hand_link.dae" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.1 0.1 0.1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/left_hand_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint
+    name="left_hand_joint"
+    type="fixed">
+    <origin
+      xyz="0.2605 0 -0.0185"
+      rpy="0 0 0" />
+    <parent
+      link="left_elbow_link" />
+    <child
+      link="left_hand_link" />
+    <axis
+      xyz="1 0 0" />
+    <limit
+      lower="-3.0543261909900767596164588448551"
+      upper="3.0543261909900767596164588448551"
+      effort="6"
+      velocity="12" />
   </joint>
   <link
     name="right_shoulder_pitch_link">
@@ -953,12 +1008,9 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <collision>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
+      <origin xyz="0 0.05  0" rpy="-1.5707963267948966192313216916398 0 0" />
       <geometry>
-        <mesh
-          filename="../meshes/right_shoulder_pitch_link.STL" />
+        <cylinder radius="0.03" length="0.04"/>
       </geometry>
     </collision>
   </link>
@@ -1010,13 +1062,10 @@ Stephen Brawner (brawner@gmail.com)
           rgba="0.1 0.1 0.1 1" />
       </material>
     </visual>
-    <collision>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
+      <collision>
+      <origin xyz="0 0 -0.06" rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="../meshes/right_shoulder_roll_link.STL" />
+        <cylinder radius="0.05" length="0.15"/>
       </geometry>
     </collision>
   </link>
@@ -1069,12 +1118,9 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <collision>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
+      <origin xyz="0 0 -0.1" rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="../meshes/right_shoulder_yaw_link.STL" />
+        <cylinder radius="0.04" length="0.18"/>
       </geometry>
     </collision>
   </link>
@@ -1100,13 +1146,13 @@ Stephen Brawner (brawner@gmail.com)
     name="right_elbow_link">
     <inertial>
       <origin
-        xyz="0.15908 0.000144 -0.015776"
+        xyz="0.164862 -0.000118 -0.015734"
         rpy="0 0 0" />
       <mass
-        value="0.669" />
+        value="0.723" />
       <inertia
         ixx="0.00042388"
-        ixy="3.6086E-05"
+        ixy="3.6086E-05" 
         ixz="0.00029293"
         iyy="0.0060062"
         iyz="-4.664E-06"
@@ -1127,15 +1173,70 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <collision>
+      <origin xyz="0.15 0 -0.018" rpy="0 1.57 0" />
+      <geometry>
+        <cylinder radius="0.035" length="0.24"/>
+      </geometry>
+    </collision>
+  </link>
+    <link
+    name="right_hand_link">
+    <inertial>
+      <origin
+        xyz="0.003993 0.000094 0"
+        rpy="0 0 0" />
+      <mass
+        value="0.014" />
+      <inertia
+        ixx="0.000003449"
+        ixy="-0.000000006"
+        ixz="0"
+        iyy="0.000001917"
+        iyz="0"
+        izz="0.000001932" />
+    </inertial>
+    <visual>
       <origin
         xyz="0 0 0"
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/right_elbow_link.STL" />
+          filename="../meshes/right_hand_link.dae" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.1 0.1 0.1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/right_hand_link.STL" />
       </geometry>
     </collision>
   </link>
+  <joint
+    name="right_hand_joint"
+    type="fixed">
+    <origin
+      xyz="0.2605 0 -0.0185"
+      rpy="0 0 0" />
+    <parent
+      link="right_elbow_link" />
+    <child
+      link="right_hand_link" />
+    <axis
+      xyz="1 0 0" />
+    <limit
+      lower="-3.0543261909900767596164588448551"
+      upper="3.0543261909900767596164588448551"
+      effort="6"
+      velocity="12" />
+  </joint>
   <joint
     name="right_elbow_joint"
     type="revolute">
@@ -1174,7 +1275,7 @@ Stephen Brawner (brawner@gmail.com)
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="../meshes/logo_link_gray.dae" />
+          filename="../meshes/logo_link.STL" />
       </geometry>
       <material
         name="">
@@ -1182,6 +1283,7 @@ Stephen Brawner (brawner@gmail.com)
           rgba="1 1 1 1" />
       </material>
     </visual>
+
   </link>
   <joint
     name="logo_joint"
