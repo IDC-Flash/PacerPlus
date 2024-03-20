@@ -141,7 +141,7 @@ class MotionLib():
 
 
         motion_data_list = [self._motion_data_list[i] for i in sample_idxes.cpu().int().numpy()]
-        #mp.set_sharing_strategy('file_descriptor')
+        mp.set_sharing_strategy('file_system')
 
         manager = mp.Manager()
         queue = manager.Queue()
