@@ -2,7 +2,7 @@
 notes:  "Capsual Model, rotation amp observation, large data, big ankle, Terrain"
 project_name: "crossroad_smpl"
 env:
-  motion_file: data/amass/pkls/amass_isaac_run_upright_slim.pkl
+  motion_file: data/h1_data/run_train
   # imitation_motion_file: data/amass/pkls/amass_isaac_im_train_take6_upright_slim.pkl
 
   terrain_obs: True

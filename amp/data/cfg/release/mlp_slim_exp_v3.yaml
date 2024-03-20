@@ -2,7 +2,7 @@
 notes:  "Capsual Model, rotation amp observation, large data, big ankle, Terrain"
 project_name: "crossroad_smpl"
 env:
-  motion_file: data/amass/pkls/amass_isaac_run_upright_slim.pkl
+  motion_file: data/h1_data/run_train
   # imitation_motion_file: data/amass/pkls/amass_isaac_im_train_take6_upright_slim.pkl
 
   terrain_obs: True
@@ -81,7 +81,7 @@ env:
     numTerrains: 20
     # terrain types: [smooth slope, rough slope, stairs up, stairs down, discrete, stepping, poles, flat]
     #terrainProportions: [0.1, 0.1, 0.35, 0.25, 0.2, 0., 0., 0.1]
-    terrainProportions: [0, 0, 0, 0, 0., 0., 0., 0.1]
+    terrainProportions: [0, 0, 0, 0, 0., 0., 0., 1]
     # tri mesh only:
     slopeTreshold: 0.9
     
