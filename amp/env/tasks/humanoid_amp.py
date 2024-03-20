@@ -23,9 +23,7 @@ from isaacgym import gymtorch
 
 from env.tasks.humanoid import Humanoid, dof_to_obs, remove_base_rot, dof_to_obs_smpl
 from env.util import gym_util
-from amp.utils.motion_lib import MotionLib
-from amp.utils.motion_lib_smpl import MotionLib as MotionLibSMPL
-from poselib.poselib.skeleton.skeleton3d import SkeletonTree
+from amp.utils.motion_lib_h1 import MotionLib as MotionLibH1
 
 from isaacgym.torch_utils import *
 from utils import torch_utils
@@ -248,9 +246,9 @@ class HumanoidAMP(Humanoid):
         motion_res = self._get_smpl_state_from_motionlib_cache(
                 motion_ids, motion_times)
 
-        root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, smpl_params, limb_weights, pose_aa, rb_pos, rb_rot, body_vel, body_ang_vel = \
-                motion_res["root_pos"], motion_res["root_rot"], motion_res["dof_pos"], motion_res["root_vel"], motion_res["root_ang_vel"], motion_res["dof_vel"], \
-                motion_res["key_pos"], motion_res["motion_bodies"], motion_res["motion_limb_weights"], motion_res["motion_aa"], motion_res["rg_pos"], motion_res["rb_rot"], motion_res["body_vel"], motion_res["body_ang_vel"]
+        root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_pos, local_pos = \
+              motion_res["root_pos"], motion_res["root_rot"], motion_res["root_vel"], motion_res["root_ang_vel"], motion_res["dof_pos"], motion_res["dof_vel"], motion_res["key_pos"], motion_res["local_pos"]
+
 
         amp_obs_demo = build_robot_amp_observation(root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel)
         return amp_obs_demo
@@ -273,17 +271,12 @@ class HumanoidAMP(Humanoid):
         return
 
     def _load_motion(self, motion_file):
-        self._motion_lib = MotionLibSMPL(
+        self._motion_lib = MotionLibH1(
                 motion_file=motion_file,
-                key_body_ids=self._contact_body_ids.cpu().numpy(),
+                fps = 60,
                 device=self.device)
-        # load
-        smpl_asset_path = os.getcwd()
-        smpl_asset_file = 'amp/data/assets/mjcf/smpl_humanoid.xml'
-        sk_tree = SkeletonTree.from_mjcf(os.path.join(smpl_asset_path, smpl_asset_file))
-        self.skeleton_trees = [sk_tree] * self.num_envs
-        self._motion_lib.load_motions(skeleton_trees = self.skeleton_trees, gender_betas = torch.zeros([self.num_envs, 11]).float(),
-                                       limb_weights = torch.zeros([self.num_envs, 10]).float(), random_sample=not HACK_MOTION_SYNC)
+
+        self._motion_lib.load_motions(num_envs=self.num_envs)
 
 
         return
@@ -330,51 +323,51 @@ class HumanoidAMP(Humanoid):
 
     def _get_smpl_state_from_motionlib_cache(self, motion_ids, motion_times):
         motion_times = torch.clamp(motion_times, 0)
-        motion_res = self._motion_lib.get_motion_state_smpl(motion_ids, motion_times)
+        motion_res = self._motion_lib.get_motion_state(motion_ids, motion_times)
 
-        ######## change smpl dof to h1
-        dof_pos = motion_res["dof_pos"]
-        dof_vel = motion_res["dof_vel"]
+        # ######## change smpl dof to h1
+        # dof_pos = motion_res["dof_pos"]
+        # dof_vel = motion_res["dof_vel"]
 
-        dof_pos = dof_pos.reshape(-1, 23, 3)[:, SMPL_TO_H1, :]
-        dof_vel = dof_vel.reshape(-1, 23, 3)[:, SMPL_TO_H1, :]
+        # dof_pos = dof_pos.reshape(-1, 23, 3)[:, SMPL_TO_H1, :]
+        # dof_vel = dof_vel.reshape(-1, 23, 3)[:, SMPL_TO_H1, :]
             
-        dof_pos = torch_utils.exp_map_to_quat(dof_pos)
-        dof_vel = torch_utils.exp_map_to_quat(dof_vel)
+        # dof_pos = torch_utils.exp_map_to_quat(dof_pos)
+        # dof_vel = torch_utils.exp_map_to_quat(dof_vel)
 
-        B, N = dof_pos.shape[:2]
-        dof_pos = dof_pos.reshape(B*N, 4)
-        dof_pos = get_euler_xyz(dof_pos)
-        dof_pos = dof_pos.reshape(B, N, 3)
+        # B, N = dof_pos.shape[:2]
+        # dof_pos = dof_pos.reshape(B*N, 4)
+        # dof_pos = get_euler_xyz(dof_pos)
+        # dof_pos = dof_pos.reshape(B, N, 3)
 
-        dof_pos = torch.cat(( dof_pos[:, 0, [2, 0, 1]], dof_pos[:, 1, 1:2], dof_pos[:, 2, 1:2],
-                              dof_pos[:, 3, [2, 0, 1]], dof_pos[:, 4, 1:2], dof_pos[:, 5, 1:2], 
-                              dof_pos[:, 6, 2:3],
-                              dof_pos[:, 7, [1, 0, 2]], dof_pos[:, 8, 1:2],
-                              dof_pos[:, 9, [1, 0, 2]], dof_pos[:, 10, 1:2],
-                              ), dim=-1)
-        #dof_pos[:, 11:] *= np.pi
-        dof_pos += self.default_dof_pos
-        dof_pos[:, 12] += 1.1
-        dof_pos[:, 14] += 1.1
-        dof_pos[:, 16] -= 1.1
-        dof_pos[:, 18] += 1.1
+        # dof_pos = torch.cat(( dof_pos[:, 0, [2, 0, 1]], dof_pos[:, 1, 1:2], dof_pos[:, 2, 1:2],
+        #                       dof_pos[:, 3, [2, 0, 1]], dof_pos[:, 4, 1:2], dof_pos[:, 5, 1:2], 
+        #                       dof_pos[:, 6, 2:3],
+        #                       dof_pos[:, 7, [1, 0, 2]], dof_pos[:, 8, 1:2],
+        #                       dof_pos[:, 9, [1, 0, 2]], dof_pos[:, 10, 1:2],
+        #                       ), dim=-1)
+        # #dof_pos[:, 11:] *= np.pi
+        # dof_pos += self.default_dof_pos
+        # dof_pos[:, 12] += 1.1
+        # dof_pos[:, 14] += 1.1
+        # dof_pos[:, 16] -= 1.1
+        # dof_pos[:, 18] += 1.1
 
-        # dof_pos[:, 14] += 1/ 2 * np.pi
-        # dof_pos[:, 18] += 1/ 2 * np.pi0
-        dof_vel = dof_vel.reshape(B*N, 4)
+        # # dof_pos[:, 14] += 1/ 2 * np.pi
+        # # dof_pos[:, 18] += 1/ 2 * np.pi0
+        # dof_vel = dof_vel.reshape(B*N, 4)
 
-        dof_vel = get_euler_xyz(dof_vel)
-        dof_vel = dof_vel.reshape(B, N, 3) 
-        dof_vel = torch.cat(( dof_vel[:, 0, [2, 0, 1]], dof_vel[:, 1, 1:2], dof_vel[:, 2, 1:2],
-                              dof_vel[:, 3, [2, 0, 1]], dof_vel[:, 4, 1:2], dof_vel[:, 5, 1:2], 
-                              dof_vel[:, 6, 2:3],
-                              dof_vel[:, 7, [1, 0, 2]], dof_vel[:, 8, 1:2],
-                              dof_vel[:, 9,[1, 0, 2]], dof_vel[:, 10, 1:2],
-                              ), dim=-1)
-        #dof_pos[:, :10] += self.default_do    
-        motion_res["dof_pos"] = dof_pos
-        motion_res["dof_vel"] = dof_vel
+        # dof_vel = get_euler_xyz(dof_vel)
+        # dof_vel = dof_vel.reshape(B, N, 3) 
+        # dof_vel = torch.cat(( dof_vel[:, 0, [2, 0, 1]], dof_vel[:, 1, 1:2], dof_vel[:, 2, 1:2],
+        #                       dof_vel[:, 3, [2, 0, 1]], dof_vel[:, 4, 1:2], dof_vel[:, 5, 1:2], 
+        #                       dof_vel[:, 6, 2:3],
+        #                       dof_vel[:, 7, [1, 0, 2]], dof_vel[:, 8, 1:2],
+        #                       dof_vel[:, 9,[1, 0, 2]], dof_vel[:, 10, 1:2],
+        #                       ), dim=-1)
+        # #dof_pos[:, :10] += self.default_do    
+        # motion_res["dof_pos"] = dof_pos
+        # motion_res["dof_vel"] = dof_vel
         return motion_res
 
     def _sample_ref_state(self, env_ids):
@@ -394,15 +387,17 @@ class HumanoidAMP(Humanoid):
 
         motion_res = self._get_smpl_state_from_motionlib_cache(motion_ids, motion_times)
 
-        root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, smpl_params, limb_weights, pose_aa, rb_pos, rb_rot, body_vel, body_ang_vel = \
-                motion_res["root_pos"], motion_res["root_rot"], motion_res["dof_pos"], motion_res["root_vel"], motion_res["root_ang_vel"], motion_res["dof_vel"], \
-                motion_res["key_pos"], motion_res["motion_bodies"], motion_res["motion_limb_weights"], motion_res["motion_aa"], motion_res["rg_pos"], motion_res["rb_rot"], motion_res["body_vel"], motion_res["body_ang_vel"]
 
-        return motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot
+        root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_pos, local_pos = \
+              motion_res["root_pos"], motion_res["root_rot"], motion_res["root_vel"], motion_res["root_ang_vel"], motion_res["dof_pos"], motion_res["dof_vel"], motion_res["key_pos"], motion_res["local_pos"]
+
+
+
+        return motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, local_pos
 
     def _reset_ref_state_init(self, env_ids):
         num_envs = env_ids.shape[0]
-        motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot = self._sample_ref_state(env_ids)
+        motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, local_pos = self._sample_ref_state(env_ids)
 
         if flags.debug:
             root_pos[..., 2] += 0.5
@@ -411,9 +406,7 @@ class HumanoidAMP(Humanoid):
             x_grid, y_grid = torch.meshgrid(torch.arange(64), torch.arange(64))
             root_pos[:, 0], root_pos[:, 1] = x_grid.flatten()[env_ids] * 2, y_grid.flatten()[env_ids] * 2
 
-        root_pos[:, 0] += 10
-        root_pos[:, 1] += 10
-        root_pos[:, 2] += 0.1
+        root_pos[:, 2] += 1.2
         if flags.test:
             dof_pos = self.default_dof_pos
 
@@ -495,9 +488,9 @@ class HumanoidAMP(Humanoid):
         motion_times = motion_times.view(-1)
 
         motion_res = self._get_smpl_state_from_motionlib_cache(motion_ids, motion_times)
-        root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, smpl_params, limb_weights, pose_aa, rb_pos, rb_rot, body_vel, body_ang_vel = \
-                motion_res["root_pos"], motion_res["root_rot"], motion_res["dof_pos"], motion_res["root_vel"], motion_res["root_ang_vel"], motion_res["dof_vel"], \
-                motion_res["key_pos"], motion_res["motion_bodies"], motion_res["motion_limb_weights"], motion_res["motion_aa"], motion_res["rg_pos"], motion_res["rb_rot"], motion_res["body_vel"], motion_res["body_ang_vel"]
+        root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_pos = \
+              motion_res["root_pos"], motion_res["root_rot"], motion_res["root_vel"], motion_res["root_ang_vel"], motion_res["dof_pos"], motion_res["dof_vel"], motion_res["key_pos"]
+
         amp_obs_demo = build_robot_amp_observation(root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel)
 
 

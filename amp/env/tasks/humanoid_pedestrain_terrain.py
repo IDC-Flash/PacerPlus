@@ -431,9 +431,8 @@ class HumanoidPedestrianTerrain(humanoid_traj.HumanoidTraj):
 
         motion_res = self._get_smpl_state_from_motionlib_cache(motion_ids, motion_times)
 
-        root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, smpl_params, limb_weights, pose_aa, rb_pos, rb_rot, body_vel, body_ang_vel = \
-                motion_res["root_pos"], motion_res["root_rot"], motion_res["dof_pos"], motion_res["root_vel"], motion_res["root_ang_vel"], motion_res["dof_vel"], \
-                motion_res["key_pos"], motion_res["motion_bodies"], motion_res["motion_limb_weights"], motion_res["motion_aa"], motion_res["rg_pos"], motion_res["rb_rot"], motion_res["body_vel"], motion_res["body_ang_vel"]
+        root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_pos, local_pos = \
+              motion_res["root_pos"], motion_res["root_rot"], motion_res["root_vel"], motion_res["root_ang_vel"], motion_res["dof_pos"], motion_res["dof_vel"], motion_res["key_pos"], motion_res["local_pos"]
 
 
         if flags.random_heading:
@@ -442,20 +441,19 @@ class HumanoidPedestrianTerrain(humanoid_traj.HumanoidTraj):
             random_heading_quat = torch.from_numpy(sRot.from_euler("xyz", random_rot).as_quat()).float().to(self.device)
             random_heading_quat_repeat = random_heading_quat[:, None].repeat(1, 24, 1)
             root_rot = quat_mul(random_heading_quat, root_rot).clone()
-            rb_pos = quat_apply(random_heading_quat_repeat, rb_pos - root_pos[:, None, :]).clone()
+            local_pos = quat_apply(random_heading_quat_repeat, local_pos).clone()
             key_pos  = quat_apply(random_heading_quat_repeat[:, :4, :], (key_pos - root_pos[:, None, :])).clone()
-            rb_rot = quat_mul(random_heading_quat_repeat, rb_rot).clone()
             root_ang_vel = quat_apply(random_heading_quat, root_ang_vel).clone()
 
             curr_heading = torch_utils.calc_heading_quat(root_rot)
             root_vel[:, 0] = torch.rand([num_envs]) * vel_range + vel_min
             root_vel = quat_apply(curr_heading, root_vel).clone()
 
-        return motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot
+        return motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, local_pos
 
     def _reset_ref_state_init(self, env_ids):
         num_envs = env_ids.shape[0]
-        motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot = self._sample_ref_state(env_ids)
+        motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, local_pos = self._sample_ref_state(env_ids)
         ## Randomrized location setting
         new_root_xy = self.terrain.sample_valid_locations(self.num_envs, env_ids)
 
@@ -473,7 +471,7 @@ class HumanoidPedestrianTerrain(humanoid_traj.HumanoidTraj):
 
         center_height = self.get_center_heights(root_states, env_ids=env_ids).mean(dim=-1)
 
-        root_pos[:, 2] += center_height+0.1
+        root_pos[:, 2] += center_height + 1.05
 
 
         self._set_env_state(env_ids=env_ids,

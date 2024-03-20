@@ -16,15 +16,10 @@ from isaacgym.torch_utils import *
 from amp.utils import torch_utils
 import joblib
 import torch
-from poselib.poselib.skeleton.skeleton3d import SkeletonMotion, SkeletonState
 import torch.multiprocessing as mp
 import copy
 import gc
-from uhc.smpllib.smpl_parser import (
-    SMPL_Parser,
-    SMPLH_Parser,
-    SMPLX_Parser,
-)
+
 
 USE_CACHE = True
 print("MOVING MOTION DATA TO GPU, USING CACHE:", USE_CACHE)
@@ -41,42 +36,16 @@ if not USE_CACHE:
 
     torch.Tensor.numpy = Patch.numpy
 
-def local_rotation_to_dof_vel(local_rot0, local_rot1, dt):
-    # Assume each joint is 3dof
-    diff_quat_data = quat_mul_norm(quat_inverse(local_rot0), local_rot1)
-    diff_angle, diff_axis = quat_angle_axis(diff_quat_data)
-    dof_vel = diff_axis * diff_angle.unsqueeze(-1) / dt
-
-    return dof_vel[1:, :].flatten()
 
 
-def compute_motion_dof_vels(motion):
-    num_frames = motion.tensor.shape[0]
-    dt = 1.0 / motion.fps
-    dof_vels = []
-
-    for f in range(num_frames - 1):
-        local_rot0 = motion.local_rotation[f]
-        local_rot1 = motion.local_rotation[f + 1]
-        frame_dof_vel = local_rotation_to_dof_vel(local_rot0, local_rot1, dt)
-        dof_vels.append(frame_dof_vel)
-
-    dof_vels.append(dof_vels[-1])
-    dof_vels = torch.stack(dof_vels, dim=0).view(num_frames, -1, 3)
-
-    return dof_vels
-
-
-
-
-def load_motion_with_skeleton(ids, motion_data_list, queue, pid):
+def load_motion_from_npz(ids, motion_data_list, queue, pid):
     # ZL: loading motion with the specified skeleton. Perfoming forward kinematics to get the joint positions
     res = {}
     for f in tqdm(range(len(motion_data_list))):
         assert (len(ids) == len(motion_data_list))
         curr_id = ids[f] # id for this datasample
         curr_file = motion_data_list[f]
-        data = np.load(curr_file['file'], allow_pickle=True)
+        data = np.load(curr_file, allow_pickle=True)
         curr_motion = {}
         for key in data.keys():
             curr_motion[key] = torch.from_numpy(data[key])
@@ -125,9 +94,8 @@ class DeviceCache:
 
 
 class MotionLib():
-    def __init__(self, motion_file, key_body_ids, fps, device, debug=False):
+    def __init__(self, motion_file, fps, device, debug=False):
         self.debug = debug
-        self._key_body_ids = torch.tensor(key_body_ids, device=device)
         self._device = device
         self._motion_data_list = [os.path.join(motion_file, f) for f in os.listdir(motion_file)]
         self._num_unique_motions = len(self._motion_data_list)
@@ -171,9 +139,8 @@ class MotionLib():
 
         self._sampling_batch_prob =  self._sampling_prob[self._curr_motion_ids]/self._sampling_prob[self._curr_motion_ids].sum()
 
-        print("Sampling motion:", sample_idxes[:10])
 
-        motion_data_list = self._motion_data_list[sample_idxes.cpu().numpy()]
+        motion_data_list = [self._motion_data_list[i] for i in sample_idxes.cpu().int().numpy()]
         #mp.set_sharing_strategy('file_descriptor')
 
         manager = mp.Manager()
@@ -194,11 +161,11 @@ class MotionLib():
         workers = []
         for i in range(1, len(jobs)):
             worker_args = (*job_args[i], queue, i)
-            worker = mp.Process(target=load_motion_with_skeleton,
+            worker = mp.Process(target=load_motion_from_npz,
                                 args=worker_args)
             worker.start()
             workers.append(worker)
-        res_acc.update(load_motion_with_skeleton(*jobs[0], None, 0))
+        res_acc.update(load_motion_from_npz(*jobs[0], None, 0))
 
         for i in tqdm(range(len(jobs) - 1)):
             res = queue.get()
@@ -212,10 +179,10 @@ class MotionLib():
             if USE_CACHE:
                 curr_motion = DeviceCache(curr_motion, self._device)
 
-            motion_fps = self._motion_fps
+            motion_fps = self._fps
             curr_dt = 1.0 / motion_fps
 
-            num_frames = curr_motion['base_pose'].shape[0]
+            num_frames = curr_motion.obj['base_pose'].shape[0]
             curr_len = 1.0 / motion_fps * (num_frames - 1)
 
             self._motion_fps.append(motion_fps)
@@ -240,14 +207,15 @@ class MotionLib():
 
         self._num_motions = len(motions)
 
-        self.gts = torch.cat([torch.zeros_like(m['base_pose']) for m in motions], dim=0).float()
-        self.grs = torch.cat([m['base_pose'] for m in motions], dim=0).float()
-        self.grvs = torch.cat([m['base_velocity'] for m in motions], dim=0).float()
-        self.gravs = torch.cat([m['base_angular_velocity'] for m in motions], dim=0).float()
-        self.lrs = torch.cat([m['joint_position'] for m in motions], dim=0).float()
-        self.dvs = torch.cat([m['joint_velocity'] for m in motions], dim=0).float()
-        self.lal = torch.cat([m['left_ankle_location'] for m in motions], dim=0).float()
-        self.ral = torch.cat([m['right_ankle_location'] for m in motions], dim=0).float()
+        self.gts = torch.cat([torch.zeros_like(m.obj['base_pose']) for m in motions], dim=0).float().to(self._device)
+        self.grs = torch.cat([m.obj['base_pose'] for m in motions], dim=0).float().to(self._device)
+        self.grvs = torch.cat([m.obj['base_velocity'] for m in motions], dim=0).float().to(self._device)
+        self.gravs = torch.cat([m.obj['base_angular_velocity'] for m in motions], dim=0).float().to(self._device)
+        self.lrs = torch.cat([m.obj['joint_position'] for m in motions], dim=0).float().to(self._device)
+        self.lps = torch.cat([m.obj['link_location'] for m in motions], dim=0).float().to(self._device)
+        self.dvs = torch.cat([m.obj['joint_velocity'] for m in motions], dim=0).float().to(self._device)
+        self.lal = torch.cat([m.obj['left_ankle_location'] for m in motions], dim=0).float().to(self._device)
+        self.ral = torch.cat([m.obj['right_ankle_location'] for m in motions], dim=0).float().to(self._device)
 
         lengths = self._motion_num_frames
         lengths_shifted = lengths.roll(1)
@@ -257,7 +225,7 @@ class MotionLib():
                                        dtype=torch.long,
                                        device=self._device)
         motion = motions[0]
-        self.num_bodies = motion['joint_position'].shape[1] + 1
+        self.num_bodies = motion.obj['joint_position'].shape[1] + 1
 
         num_motions = self.num_motions()
         total_len = self.get_total_length()
@@ -342,8 +310,7 @@ class MotionLib():
 
     def get_motion_state(self, motion_ids, motion_times, offset = None):
         n = len(motion_ids)
-        num_bodies = self._get_num_bodies()
-        num_key_bodies = self._key_body_ids.shape[0]
+
 
         motion_len = self._motion_lengths[motion_ids]
         num_frames = self._motion_num_frames[motion_ids]
@@ -360,9 +327,18 @@ class MotionLib():
         dof_vel0 = self.dvs[f0l]
         dof_vel1 = self.dvs[f1l]
 
-        rg_pos0 = self.gts[f0l, :]
-        rg_pos1 = self.gts[f1l, :]
+        rg_pos0 = self.gts[f0l]
+        rg_pos1 = self.gts[f1l]
+        rb_rot0 = self.grs[f0l]
+        rb_rot1 = self.grs[f1l]
 
+        rg_vel0 = self.grvs[f0l]
+        rg_vel1 = self.grvs[f1l]
+        rg_ang_vel0 = self.gravs[f0l]
+        rg_ang_vel1 = self.gravs[f1l]
+
+        lp_pos0 = self.lps[f0l]
+        lp_pos1 = self.lps[f1l]
 
         vals = [
              dof_pos0, dof_pos1,  rg_pos0, rg_pos1, dof_vel0, dof_vel1
@@ -371,30 +347,20 @@ class MotionLib():
             assert v.dtype != torch.float64
 
         blend = blend.unsqueeze(-1)
-
         blend_exp = blend.unsqueeze(-1)
 
-        rg_pos = (1.0 - blend_exp) * rg_pos0 + blend_exp * rg_pos1 
+        rg_pos = (1.0 - blend) * rg_pos0 + blend * rg_pos1 
         dof_pos = (1.0 - blend) * dof_pos0 + blend * dof_pos1
-        dof_vel = (1.0 - blend_exp) * dof_vel0 + blend_exp * dof_vel1
+        dof_vel = (1.0 - blend) * dof_vel0 + blend * dof_vel1
         left_ankle_pos = (1.0 - blend) * self.lal[f0l] + blend * self.lal[f1l]
         right_ankle_pos = (1.0 - blend) * self.ral[f0l] + blend * self.ral[f1l]
         key_pos = torch.stack([left_ankle_pos, right_ankle_pos], dim=1)
-        
-
-
-        rb_rot0 = self.grs[f0l]
-        rb_rot1 = self.grs[f1l]
-        rb_rot = torch_utils.slerp(rb_rot0, rb_rot1, blend_exp)
-
-
-        rg_vel0 = self.grvs[f0l]
-        rg_vel1 = self.grvs[f1l]
-        rg_vel = (1.0 - blend_exp) * rg_vel0 + blend_exp * rg_vel1
-
-        rg_ang_vel0 = self.gravs[f0l]
-        rg_ang_vel1 = self.gravs[f1l]
-        rg_ang_vel = (1.0 - blend_exp) * rg_ang_vel0 + blend_exp * rg_ang_vel1
+        rb_rot0 = torch_utils.exp_map_to_quat(rb_rot0)
+        rb_rot1 = torch_utils.exp_map_to_quat(rb_rot1)
+        rb_rot = torch_utils.slerp(rb_rot0, rb_rot1, blend)
+        rg_vel = (1.0 - blend) * rg_vel0 + blend * rg_vel1
+        rg_ang_vel = (1.0 - blend) * rg_ang_vel0 + blend * rg_ang_vel1
+        lp = (1.0 - blend_exp) * lp_pos0 + blend_exp * lp_pos1
 
         # self.torch_humanoid.fk_batch()
 
@@ -406,7 +372,7 @@ class MotionLib():
             "dof_pos": dof_pos.clone(),
             "dof_vel": dof_vel.clone(),
             "key_pos": key_pos,
-
+            "local_pos": lp.clone(),
         }
 
 

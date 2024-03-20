@@ -104,20 +104,20 @@ class HumanoidViewMotion(HumanoidAMP):
 
         motion_res = self._get_smpl_state_from_motionlib_cache(motion_ids, motion_times)
             
-        root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, smpl_params, limb_weights, pose_aa, rb_pos, rb_rot, body_vel, body_ang_vel = \
-                motion_res["root_pos"], motion_res["root_rot"], motion_res["dof_pos"], motion_res["root_vel"], motion_res["root_ang_vel"], motion_res["dof_vel"], \
-                motion_res["key_pos"], motion_res["motion_bodies"], motion_res["motion_limb_weights"], motion_res["motion_aa"], motion_res["rg_pos"], motion_res["rb_rot"], motion_res["body_vel"], motion_res["body_ang_vel"]
+        root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_pos, local_pos = \
+              motion_res["root_pos"], motion_res["root_rot"], motion_res["root_vel"], motion_res["root_ang_vel"], motion_res["dof_pos"], motion_res["dof_vel"], motion_res["key_pos"], motion_res["local_pos"]
+
 
 
 
         env_ids = torch.arange(self.num_envs, dtype=torch.long, device=self.device)
         self._root_states[env_ids, 0:3] = root_pos
-        self._root_states[:, 2] += 0.3
+        self._root_states[:, 2] += 1.1
         self._root_states[env_ids, 3:7] = root_rot
         self._root_states[env_ids, 7:10] = 0
         self._root_states[env_ids, 10:13] = 0
-        self._dof_pos[env_ids] = dof_pos
-        self._dof_vel[env_ids] = 0
+        self.dof_pos[env_ids] = dof_pos
+        self.dof_vel[env_ids] = 0
         
 
         env_ids_int32 = self._humanoid_actor_ids[env_ids]
