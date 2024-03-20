@@ -326,9 +326,10 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <collision>
-      <origin xyz="0.05 0.0 -0.053" rpy="0 0 0" />
+      <origin xyz="0.0 0.0 0.0" rpy="0 0 0" />
       <geometry>
-        <box size="0.29 0.03 0.026"/>
+        <mesh
+          filename="../meshes/left_ankle_link.STL" />
       </geometry>
     </collision>
   </link>
@@ -615,9 +616,10 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <collision>
-      <origin xyz="0.05 0.0 -0.053" rpy="0 0 0" />
+      <origin xyz="0.0 0.0 0.0" rpy="0 0 0" />
       <geometry>
-        <box size="0.29 0.03 0.026"/>
+        <mesh
+          filename="../meshes/right_ankle_link.STL" />
       </geometry>
     </collision>
   </link>

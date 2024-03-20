@@ -130,7 +130,7 @@ class HumanoidAMP(Humanoid):
 
     def resample_motions(self):
         print("Partial solution, only resample motions...")
-        self._motion_lib.load_motions(skeleton_trees = self.skeleton_trees, limb_weights = torch.zeros([self.num_envs, 10]).float(), gender_betas = torch.zeros([self.num_envs, 11]).float()) # For now, only need to sample motions since there are only 400 hmanoids
+        self._motion_lib.load_motions(self.num_envs) # For now, only need to sample motions since there are only 400 hmanoids
 
 
     def register_obs_hist(self, env_ids, obs):
@@ -406,7 +406,7 @@ class HumanoidAMP(Humanoid):
             x_grid, y_grid = torch.meshgrid(torch.arange(64), torch.arange(64))
             root_pos[:, 0], root_pos[:, 1] = x_grid.flatten()[env_ids] * 2, y_grid.flatten()[env_ids] * 2
 
-        root_pos[:, 2] += 1.2
+        root_pos[:, 2] += 1.05
         if flags.test:
             dof_pos = self.default_dof_pos
 

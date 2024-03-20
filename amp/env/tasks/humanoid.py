@@ -115,11 +115,15 @@ class Humanoid(BaseTask):
         actor_root_state = self.gym.acquire_actor_root_state_tensor(self.sim)
         dof_state_tensor = self.gym.acquire_dof_state_tensor(self.sim)
         net_contact_forces = self.gym.acquire_net_contact_force_tensor(self.sim)
+        rigid_body_state = self.gym.acquire_rigid_body_state_tensor(self.sim)
+        dof_force_tensor = self.gym.acquire_dof_force_tensor(self.sim)
 
         # refresh the tensors
         self.gym.refresh_dof_state_tensor(self.sim)
         self.gym.refresh_actor_root_state_tensor(self.sim)
         self.gym.refresh_net_contact_force_tensor(self.sim)
+        self.gym.refresh_rigid_body_state_tensor(self.sim)
+
 
         # obtain the 
         self._root_states = gymtorch.wrap_tensor(actor_root_state)
@@ -144,6 +148,23 @@ class Humanoid(BaseTask):
         self._contact_forces = net_contact_forces_tensor.reshape(self.num_envs, -1, 3)
 
 
+        self._rigid_body_state = gymtorch.wrap_tensor(rigid_body_state)
+        bodies_per_env = self._rigid_body_state.shape[0] // self.num_envs
+        self._rigid_body_state_reshaped = self._rigid_body_state.view(self.num_envs, bodies_per_env, 13)
+
+        self._rigid_body_pos = self._rigid_body_state_reshaped[..., :self.num_bodies,
+                                                         0:3]
+        self._rigid_body_rot = self._rigid_body_state_reshaped[..., :self.num_bodies,
+                                                         3:7]
+        self._rigid_body_vel = self._rigid_body_state_reshaped[..., :self.num_bodies,
+                                                         7:10]
+        self._rigid_body_ang_vel = self._rigid_body_state_reshaped[
+            ..., :self.num_bodies, 10:13]
+
+        dof_force_tensor = self.gym.acquire_dof_force_tensor(self.sim)
+        self.dof_force_tensor = gymtorch.wrap_tensor(dof_force_tensor).view(
+            self.num_envs, self.num_dofs)
+        
         self._terminate_buf = torch.ones(self.num_envs,
                                          device=self.device,
                                          dtype=torch.long)
@@ -526,19 +547,19 @@ class Humanoid(BaseTask):
         actuator_props = self.gym.get_asset_actuator_properties(
             robot_asset)
         
-        sensor_options = gymapi.ForceSensorProperties()
-        sensor_options.enable_forward_dynamics_forces = False # for example gravity
-        sensor_options.enable_constraint_solver_forces = True # for example contacts
-        sensor_options.use_world_frame = True
-        # create force sensors at the feet
-        right_foot_idx = self.gym.find_asset_rigid_body_index(
-            robot_asset, "right_ankle")
-        left_foot_idx = self.gym.find_asset_rigid_body_index(
-            robot_asset, "left_ankle")
-        sensor_pose = gymapi.Transform()
+        # sensor_options = gymapi.ForceSensorProperties()
+        # sensor_options.enable_forward_dynamics_forces = False # for example gravity
+        # sensor_options.enable_constraint_solver_forces = True # for example contacts
+        # sensor_options.use_world_frame = True
+        # # create force sensors at the feet
+        # right_foot_idx = self.gym.find_asset_rigid_body_index(
+        #     robot_asset, "right_ankle")
+        # left_foot_idx = self.gym.find_asset_rigid_body_index(
+        #     robot_asset, "left_ankle")
+        # sensor_pose = gymapi.Transform()
 
-        self.gym.create_asset_force_sensor(robot_asset, right_foot_idx, sensor_pose, sensor_options)
-        self.gym.create_asset_force_sensor(robot_asset, left_foot_idx, sensor_pose,sensor_options)
+        # self.gym.create_asset_force_sensor(robot_asset, right_foot_idx, sensor_pose, sensor_options)
+        # self.gym.create_asset_force_sensor(robot_asset, left_foot_idx, sensor_pose,sensor_options)
         self.robot_assets = [robot_asset] * num_envs
  
         self.torso_index = 0
@@ -692,6 +713,10 @@ class Humanoid(BaseTask):
     def _refresh_sim_tensors(self):
         self.gym.refresh_dof_state_tensor(self.sim)
         self.gym.refresh_actor_root_state_tensor(self.sim)
+        self.gym.refresh_rigid_body_state_tensor(self.sim)
+
+        self.gym.refresh_force_sensor_tensor(self.sim)
+        self.gym.refresh_dof_force_tensor(self.sim)
         self.gym.refresh_net_contact_force_tensor(self.sim)
         if self._state_reset_happened and "default_dof_pos" in self.__dict__:
             # ZL: Hack to get rigidbody pos and rot to be the correct values. Needs to be called after _set_env_state

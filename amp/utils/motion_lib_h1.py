@@ -112,7 +112,7 @@ class MotionLib():
     def load_motions(self, num_envs, random_sample = True, start_idx = 0):
         # load motion load the same number of motions as there are skeletons (humanoids)
         if "gts" in self.__dict__:
-            del self.gts , self.grs , self.lrs, self.grvs, self.gravs , self.gavs , self.gvs, self.dvs,
+            del self.gts , self.grs , self.lrs, self.grvs, self.gravs , self.gvs, self.dvs,
             del  self._motion_lengths, self._motion_fps, self._motion_dt, self._motion_num_frames, self._motion_bodies, self._motion_aa , self._motion_quat
 
         motions = []

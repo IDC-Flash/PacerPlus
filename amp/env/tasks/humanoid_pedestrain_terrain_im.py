@@ -36,6 +36,7 @@ class HumanoidPedestrianTerrainIm(humanoid_pedestrain_terrain.HumanoidPedestrian
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
         self._full_body_reward = cfg["env"].get("full_body_reward", True)
         self._min_motion_len = cfg["env"].get("min_length", -1)
+
         self.use_different_motion_file = cfg["env"].get("use_different_motion_file", True)
         self.reset_buffer = cfg["env"].get("reset_buffer", 0)
 
@@ -46,19 +47,8 @@ class HumanoidPedestrianTerrainIm(humanoid_pedestrain_terrain.HumanoidPedestrian
             self._infilling_handles = [[] for _ in range(cfg['args'].num_envs)]
 
         super().__init__(cfg, sim_params, physics_engine, device_type, device_id, headless)
-        self._track_bodies = cfg["env"].get("trackBodies", self._full_track_bodies)
-        self._track_bodies_id = self._build_key_body_ids_tensor(self._track_bodies)
-        self._full_track_bodies_id = self._build_key_body_ids_tensor(self._full_track_bodies)
 
-        self._reset_bodies = cfg["env"].get("resetBodies", self._full_track_bodies.copy())
-        if self.remove_foot_reset_im:
-            self._reset_bodies.remove('L_Ankle');self._reset_bodies.remove('R_Ankle');
-            if not self.remove_toe_im:
-                self._reset_bodies.remove('L_Toe');self._reset_bodies.remove('R_Toe');
-    
-        self._reset_body_ids = self._build_key_body_ids_tensor(self._reset_bodies)
-
-        self.reward_raw = torch.zeros((self.num_envs, 3)).to(self.device)
+        self.reward_raw = torch.zeros((self.num_envs, 2+self.num_locomotion_reward)).to(self.device)
         self.terminate_dist = cfg['env'].get('terminate_dist', 0.4), 
         self.use_imitation_reset = cfg['env'].get('use_imitation_reset', False)
 
@@ -85,26 +75,10 @@ class HumanoidPedestrianTerrainIm(humanoid_pedestrain_terrain.HumanoidPedestrian
             self._build_infilling_marker_state_tensors()
 
         self.imitation_ref_motion_cache = {}
-        self.im_dof_pos = torch.zeros((self.num_envs, self.num_dof//3, 3), device=self.device)
         self.d3_visible = torch.zeros((self.num_envs), dtype=torch.int, device=self.device)
         self.im_ref_rb_target_pos = torch.zeros((self.num_envs, self.num_bodies, 3), device=self.device).float()
-        self._build_mujoco_smpl_transform()
 
-    def _build_mujoco_smpl_transform(self, ):
-        mujoco_joint_names = [
-            'Pelvis', 'L_Hip', 'L_Knee', 'L_Ankle', 'L_Toe', 'R_Hip', 'R_Knee',
-            'R_Ankle', 'R_Toe', 'Torso', 'Spine', 'Chest', 'Neck', 'Head', 'L_Thorax',
-            'L_Shoulder', 'L_Elbow', 'L_Wrist', 'L_Hand', 'R_Thorax', 'R_Shoulder',
-            'R_Elbow', 'R_Wrist', 'R_Hand'
-        ]
-        self.smpl_2_mujoco = [
-            joint_names.index(q) for q in mujoco_joint_names
-            if q in joint_names
-        ]
-        self.mujoco_2_smpl = [
-            mujoco_joint_names.index(q) for q in joint_names
-            if q in mujoco_joint_names
-        ]
+
 
     def build_body_tracking_mask(self, env_ids):
         ### build tracking_mask
@@ -397,70 +371,6 @@ class HumanoidPedestrianTerrainIm(humanoid_pedestrain_terrain.HumanoidPedestrian
             self._set_target_motion_state(env_ids)
         return
     
-    def _get_fixed_smpl_state_from_imitation_motionlib(self, motion_ids, motion_times, curr_gender_betas):
-        # Used for intialization. Not used for sampling. Only used for AMP, not imitation.
-        motion_res = self._get_smpl_state_from_imitation_motionlib_cache(motion_ids, motion_times)
-        root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, _, pose_aa, rb_pos, rb_rot, body_vel, body_ang_vel = \
-                motion_res["root_pos"], motion_res["root_rot"], motion_res["dof_pos"], motion_res["root_vel"], motion_res["root_ang_vel"], motion_res["dof_vel"], \
-                motion_res["key_pos"], motion_res["motion_bodies"], motion_res["motion_aa"], motion_res["rg_pos"], motion_res["rb_rot"], motion_res["body_vel"], motion_res["body_ang_vel"]
-
-        with torch.no_grad():
-            gender = curr_gender_betas[:, 0]
-            betas = curr_gender_betas[:, 1:]
-            B, _ = betas.shape
-
-            genders_curr = gender == 2
-            height_tolorance = 0.02
-            if genders_curr.sum() > 0:
-                poses_curr = pose_aa[genders_curr]
-                root_pos_curr = root_pos[genders_curr]
-                betas_curr = betas[genders_curr]
-                vertices_curr, joints_curr = self.smpl_parser_f.get_joints_verts(
-                    poses_curr, betas_curr, root_pos_curr)
-                offset = joints_curr[:, 0] - root_pos[genders_curr]
-                diff_fix = ((vertices_curr - offset[:, None])[..., -1].min(dim=-1).values - height_tolorance)
-                root_pos[genders_curr, ..., -1] -= diff_fix
-                key_pos[genders_curr, ..., -1] -= diff_fix[:, None]
-                rb_pos[genders_curr, ..., -1] -= diff_fix[:, None]
-
-            genders_curr = gender == 1
-            if genders_curr.sum() > 0:
-                poses_curr = pose_aa[genders_curr]
-                root_pos_curr = root_pos[genders_curr]
-                betas_curr = betas[genders_curr]
-                vertices_curr, joints_curr = self.smpl_parser_m.get_joints_verts(
-                    poses_curr, betas_curr, root_pos_curr)
-
-                offset = joints_curr[:, 0] - root_pos[genders_curr]
-                diff_fix = (
-                    (vertices_curr - offset[:, None])[..., -1].min(dim=-1).values -
-                    height_tolorance)
-                root_pos[genders_curr, ..., -1] -= diff_fix
-                key_pos[genders_curr, ..., -1] -= diff_fix[:, None]
-                rb_pos[genders_curr, ..., -1] -= diff_fix[:, None]
-
-            genders_curr = gender == 0
-            if genders_curr.sum() > 0:
-                poses_curr = pose_aa[genders_curr]
-                root_pos_curr = root_pos[genders_curr]
-                betas_curr = betas[genders_curr]
-                vertices_curr, joints_curr = self.smpl_parser_n.get_joints_verts(
-                    poses_curr, betas_curr, root_pos_curr)
-
-                offset = joints_curr[:, 0] - root_pos[genders_curr]
-                diff_fix = (
-                    (vertices_curr - offset[:, None])[..., -1].min(dim=-1).values -
-                    height_tolorance)
-                root_pos[genders_curr, ..., -1] -= diff_fix
-                key_pos[genders_curr, ..., -1] -= diff_fix[:, None]
-                rb_pos[genders_curr, ..., -1] -= diff_fix[:, None]
-
-            return root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, rb_pos, rb_rot, body_vel, body_ang_vel
-
-    def _get_smpl_state_from_imitation_motionlib_cache(self, motion_ids, motion_times):
-        ## Chace the motion
-        motion_res = self._imitation_motion_lib.get_motion_state_smpl(motion_ids, motion_times)
-        return motion_res
     
     def _set_target_motion_state(self, env_ids=None):
         if env_ids is None:
@@ -587,112 +497,6 @@ class HumanoidPedestrianTerrainIm(humanoid_pedestrain_terrain.HumanoidPedestrian
         else:
             self.d3_visible[env_ids] = d3_visible
 
-        return obs
-
-    def _compute_flip_task_obs(self, normal_task_obs, env_ids):
-
-        # location_obs  20
-        # Terrain obs: self.num_terrain_obs
-        # group obs
-        basic_obs = super()._compute_flip_task_obs(normal_task_obs, env_ids)
-        if (env_ids is None):
-            body_pos = self._rigid_body_pos.clone()
-            body_rot = self._rigid_body_rot.clone()
-            body_vel = self._rigid_body_vel.clone()
-            body_ang_vel = self._rigid_body_ang_vel.clone()
-            body_dof = self._dof_pos.clone()
-            env_ids = torch.arange(self.num_envs,
-                               dtype=torch.long,
-                               device=self.device)
-        else:
-            body_pos = self._rigid_body_pos[env_ids].clone()
-            body_rot = self._rigid_body_rot[env_ids].clone()
-            body_vel = self._rigid_body_vel[env_ids].clone()
-            body_dof = self._dof_pos[env_ids].clone()
-            body_ang_vel = self._rigid_body_ang_vel[env_ids]
-
-        curr_gender_betas = self.humanoid_betas[env_ids]
-        
-        ######### we need a flag for this observation
-        ######### if flag == 1, we need to compute the observation
-        ######### if flag == 0, we need do not need the imitation target in the observation
-
-        ref_start = torch.tensor(self.reference_start_index).to(self.device)
-        ref_length = torch.tensor(self.reference_length).to(self.device)
-        motion_times = (self.progress_buf[env_ids] + 1) * self.dt
-        motion_res = self._get_smpl_state_from_imitation_motionlib_cache(env_ids, motion_times)
-        time_steps = 1
-        root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, smpl_params, limb_weights, pose_aa, ref_rb_pos, ref_rb_rot, ref_body_vel = \
-                motion_res["root_pos"], motion_res["root_rot"], motion_res["dof_pos"], motion_res["root_vel"], motion_res["root_ang_vel"], motion_res["dof_vel"], \
-                motion_res["key_pos"], motion_res["motion_bodies"], motion_res["motion_limb_weights"], motion_res["motion_aa"], motion_res["rg_pos"], motion_res["rb_rot"], motion_res["body_vel"]
-
-        d3_visible = torch.zeros((env_ids.shape[0]), dtype=torch.int, device=self.device)
-        mask = ((self.progress_buf[env_ids] + 1) >= ref_start[env_ids]) & ((self.progress_buf[env_ids] + 1) < ref_start[env_ids] + ref_length[env_ids])
-        d3_visible[mask] = 1
-
-        ################## prepare for imitation
-        root_pos = root_pos.clone()
-        ref_rb_pos = ref_rb_pos.clone()
-        ref_rb_rot = ref_rb_rot.clone()
-        ref_body_vel = ref_body_vel.clone()
-        root_states = torch.cat([root_pos, root_rot], dim=-1).clone()
-        ref_diff_xy = self._traj_gen.get_diff_xy(env_ids)
-        root_pos[:, 0:2] += ref_diff_xy
-        ref_rb_pos[:, :, 0:2] += ref_diff_xy.unsqueeze(1)
-        center_heights = self.get_center_heights(root_states=root_states, env_ids=env_ids)
-        center_heights = center_heights.mean(dim=-1, keepdim=True)
-        ref_rb_pos[..., 2] += center_heights
-
-        ################## Flip left to right
-        body_pos[..., 1] *= -1 # position
-        body_pos = body_pos[..., self.left_to_right_index, :]
-        body_rot[..., 0] *= -1 # angular rotation, global
-        body_rot[..., 2] *= -1
-        body_rot = body_rot[..., self.left_to_right_index, :]
-
-        body_dof = body_dof.reshape(body_dof.shape[0], -1, 3)
-        body_dof[..., 0] *= -1 # dof rotation local
-        body_dof[..., 2] *= -1
-        body_dof = body_dof[..., self.left_to_right_index_action, :]
-
-        #######
-        ref_rb_pos[..., 1] *= -1 # position
-        ref_rb_pos = ref_rb_pos[..., self.left_to_right_index, :]
-        ref_rb_rot[..., 0] *= -1
-        ref_rb_rot[..., 2] *= -1
-        ref_rb_rot = ref_rb_rot[..., self.left_to_right_index, :]
-
-        dof_pos = dof_pos.reshape(dof_pos.shape[0], -1, 3)
-        dof_pos[..., 0] *= -1 # dof rotation local
-        dof_pos[..., 2] *= -1
-        dof_pos = dof_pos[..., self.left_to_right_index_action, :]
-
-        tracking_mask_flip = self.tracking_mask[env_ids].clone()
-        tracking_mask_flip = tracking_mask_flip[..., self.left_to_right_index, :]
-        dof_tracking_mask_flip = tracking_mask_flip[:, self._track_bodies_id, :].clone()
-        dof_tracking_mask_flip = dof_tracking_mask_flip[:, 1:]
-
-        ################## Flip left to right
-        root_pos = body_pos[..., 0, :]
-        root_rot = body_rot[..., 0, :]
-        body_pos_subset = body_pos[..., self._track_bodies_id, :]  * tracking_mask_flip[:, self._track_bodies_id, :]
-        body_rot_subset = body_rot[..., self._track_bodies_id, :] * tracking_mask_flip[:, self._track_bodies_id, :]
-        body_dof = body_dof.reshape(body_dof.shape[0], -1, 3)
-        body_dof_subset = body_dof[..., [i-1 for i in self._track_bodies_id[1:]], :] * dof_tracking_mask_flip ### dof does not have root
-        body_dof_subset = body_dof_subset.reshape(body_dof_subset.shape[0], -1)
-
-        ref_rb_pos_subset = ref_rb_pos[..., self._track_bodies_id, :] * tracking_mask_flip[:, self._track_bodies_id, :]
-        ref_rb_rot_subset = ref_rb_rot[..., self._track_bodies_id, :] *tracking_mask_flip[:, self._track_bodies_id, :]
-
-        dof_pos_subset = dof_pos[..., [i-1 for i in self._track_bodies_id[1:]], :] * dof_tracking_mask_flip ### dof does not have root
-        dof_pos_subset = dof_pos_subset.reshape(dof_pos_subset.shape[0], -1)
-
-        obs = compute_imitation_observations(root_pos, root_rot, body_pos_subset, body_rot_subset, body_dof_subset, ref_rb_pos_subset, ref_rb_rot_subset,
-                                              dof_pos_subset, d3_visible, tracking_mask_flip[:, self._track_bodies_id, :], time_steps, self._has_upright_start)
-
-        obs = torch.cat([basic_obs, obs, d3_visible.unsqueeze(-1)], dim=-1)
-        if self.has_tracking_mask_obs:
-            obs = torch.cat([obs, tracking_mask_flip.squeeze(-1) * d3_visible[:, None]], dim=-1)
         return obs
 
 
