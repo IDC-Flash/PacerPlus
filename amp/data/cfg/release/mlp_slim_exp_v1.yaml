@@ -1,18 +1,18 @@
 # if given, will override the device setting in gym. 
-notes:  "Capsual Model, rotation amp observation, large data, big ankle"
+notes:  "Capsual Model, rotation amp observation, large data, big ankle, Terrain"
 project_name: "crossroad_smpl"
 env:
-  motion_file: data/amass/pkls/amass_isaac_run_upright_slim.pkl
+  motion_file: data/h1_data/run_train
   # imitation_motion_file: data/amass/pkls/amass_isaac_im_train_take6_upright_slim.pkl
 
   terrain_obs: True
   terrain_obs_type: "square_fov"
-  terrain_obs_root: "head"
+  terrain_obs_root: "pelvis"
   use_center_height: true
   use_imitation_reset: true
   real_data_mesh: false
   numEnvs: 512
-  envSpacing: 5
+  envSpacing: 0
   episodeLength: 300
   isFlagrun: False
   enableDebugVis: False
@@ -33,7 +33,7 @@ env:
   controlFrequencyInv: 4 # 50 Hz
   stateInit: "Random"
   hybridInitProb: 0.5
-  numAMPObsSteps: 2
+  numAMPObsSteps: 5
 
 
   localRootObs: True
@@ -46,9 +46,9 @@ env:
   
   numTrajSamples: 10
   trajSampleTimestep: 0.5
-  speedMin: 0.5
+  speedMin: 0
   speedMax: 2.0
-  accelMax: 0.5
+  accelMax: 1.0
   sharpTurnProb: 0.02
   useExtendedTrajectoy: True
   enableTaskObs: True
@@ -80,7 +80,8 @@ env:
     numLevels: 5
     numTerrains: 20
     # terrain types: [smooth slope, rough slope, stairs up, stairs down, discrete, stepping, poles, flat]
-    terrainProportions: [0.2, 0.1, 0.15, 0.15, 0.05, 0., 0.25, 0.1]
+    terrainProportions: [0.1, 0.1, 0.35, 0.25, 0.2, 0., 0., 0.1]
+    #terrainProportions: [0, 0, 0, 0, 0., 0., 0., 0.1]
     # tri mesh only:
     slopeTreshold: 0.9
     
@@ -90,22 +91,21 @@ env:
     restitution: 0.0
 
 sim:
-  substeps: 1
+  substeps: 2
   physx:
     num_threads: 4
     solver_type: 1  # 0: pgs, 1: tgs
     num_position_iterations: 4
     num_velocity_iterations: 0
-    contact_offset: 0.01
+    contact_offset: 0.02
     rest_offset: 0.0
-    bounce_threshold_velocity: 0.5
-    max_depenetration_velocity: 1.0
-    default_buffer_size_multiplier: 5
-    contact_collection: 2
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 10.0
+    default_buffer_size_multiplier: 10.0
+
   flex:
     num_inner_iterations: 10
     warm_start: 0.25
-
 
 
 params:
@@ -134,7 +134,7 @@ params:
         learn_sigma: False
 
     mlp:
-      units: [512, 256]
+      units: [1024, 512]
       activation: elu
       d2rl: False
       
@@ -144,7 +144,7 @@ params:
         name: None
 
     disc:
-      units: [512, 256]
+      units: [1024, 512]
       activation: elu
 
       initializer:
@@ -192,7 +192,7 @@ params:
     amp_minibatch_size: 4096
     disc_coef: 5
     disc_logit_reg: 0.01
-    disc_grad_penalty: 5.0
+    disc_grad_penalty: 1.0
     disc_reward_scale: 4
     disc_weight_decay: 0.0001
     normalize_amp_input: True

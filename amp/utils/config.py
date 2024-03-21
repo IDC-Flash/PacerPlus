@@ -166,11 +166,6 @@ def parse_sim_params(args, cfg, cfg_train):
         sim_params.physx.num_position_iterations = 4
         sim_params.physx.num_velocity_iterations = 0
         sim_params.physx.num_threads = 4
-        sim_params.physx.contact_offset = 0.01
-        sim_params.physx.rest_offset = 0.01
-        sim_params.physx.bounce_threshold_velocity = 0.5
-        sim_params.physx.max_depenetration_velocity = 1.0
-        sim_params.physx.default_buffer_size_multiplier = 0.01
         sim_params.physx.use_gpu = args.use_gpu
         sim_params.physx.num_subscenes = args.subscenes
         sim_params.physx.max_gpu_contact_pairs = 32 * 1024 * 1024
