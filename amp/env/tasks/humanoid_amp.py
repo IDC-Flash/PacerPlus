@@ -324,50 +324,6 @@ class HumanoidAMP(Humanoid):
     def _get_smpl_state_from_motionlib_cache(self, motion_ids, motion_times):
         motion_times = torch.clamp(motion_times, 0)
         motion_res = self._motion_lib.get_motion_state(motion_ids, motion_times)
-
-        # ######## change smpl dof to h1
-        # dof_pos = motion_res["dof_pos"]
-        # dof_vel = motion_res["dof_vel"]
-
-        # dof_pos = dof_pos.reshape(-1, 23, 3)[:, SMPL_TO_H1, :]
-        # dof_vel = dof_vel.reshape(-1, 23, 3)[:, SMPL_TO_H1, :]
-            
-        # dof_pos = torch_utils.exp_map_to_quat(dof_pos)
-        # dof_vel = torch_utils.exp_map_to_quat(dof_vel)
-
-        # B, N = dof_pos.shape[:2]
-        # dof_pos = dof_pos.reshape(B*N, 4)
-        # dof_pos = get_euler_xyz(dof_pos)
-        # dof_pos = dof_pos.reshape(B, N, 3)
-
-        # dof_pos = torch.cat(( dof_pos[:, 0, [2, 0, 1]], dof_pos[:, 1, 1:2], dof_pos[:, 2, 1:2],
-        #                       dof_pos[:, 3, [2, 0, 1]], dof_pos[:, 4, 1:2], dof_pos[:, 5, 1:2], 
-        #                       dof_pos[:, 6, 2:3],
-        #                       dof_pos[:, 7, [1, 0, 2]], dof_pos[:, 8, 1:2],
-        #                       dof_pos[:, 9, [1, 0, 2]], dof_pos[:, 10, 1:2],
-        #                       ), dim=-1)
-        # #dof_pos[:, 11:] *= np.pi
-        # dof_pos += self.default_dof_pos
-        # dof_pos[:, 12] += 1.1
-        # dof_pos[:, 14] += 1.1
-        # dof_pos[:, 16] -= 1.1
-        # dof_pos[:, 18] += 1.1
-
-        # # dof_pos[:, 14] += 1/ 2 * np.pi
-        # # dof_pos[:, 18] += 1/ 2 * np.pi0
-        # dof_vel = dof_vel.reshape(B*N, 4)
-
-        # dof_vel = get_euler_xyz(dof_vel)
-        # dof_vel = dof_vel.reshape(B, N, 3) 
-        # dof_vel = torch.cat(( dof_vel[:, 0, [2, 0, 1]], dof_vel[:, 1, 1:2], dof_vel[:, 2, 1:2],
-        #                       dof_vel[:, 3, [2, 0, 1]], dof_vel[:, 4, 1:2], dof_vel[:, 5, 1:2], 
-        #                       dof_vel[:, 6, 2:3],
-        #                       dof_vel[:, 7, [1, 0, 2]], dof_vel[:, 8, 1:2],
-        #                       dof_vel[:, 9,[1, 0, 2]], dof_vel[:, 10, 1:2],
-        #                       ), dim=-1)
-        # #dof_pos[:, :10] += self.default_do    
-        # motion_res["dof_pos"] = dof_pos
-        # motion_res["dof_vel"] = dof_vel
         return motion_res
 
     def _sample_ref_state(self, env_ids):
