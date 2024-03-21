@@ -266,7 +266,7 @@ class HumanoidAMP(Humanoid):
     def _setup_character_props(self, key_bodies):
         super()._setup_character_props(key_bodies)
 
-        self._num_amp_obs_per_step = 56
+        self._num_amp_obs_per_step = 50
 
         if (self._enable_hist_obs):
             self._num_self_obs += self._num_amp_obs_steps * self._num_amp_obs_per_step
@@ -558,7 +558,7 @@ def build_robot_amp_observation(root_pos, root_rot, root_vel, root_ang_vel, dof_
     flat_local_key_pos = local_key_pos.reshape(B * N, -1)
     flat_local_key_pos = torch_utils.my_quat_rotate(heading_rot.repeat(N, 1), flat_local_key_pos)
     local_key_pos = flat_local_key_pos.reshape(B, N, -1).reshape(B, -1)
-    obs = torch.cat((root_rot_obs, local_root_vel, local_root_ang_vel, dof_pos, dof_vel, local_key_pos), dim=-1)
+    obs = torch.cat((root_rot_obs, local_root_vel, local_root_ang_vel, dof_pos, dof_vel), dim=-1)
                     
     return obs
 
