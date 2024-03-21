@@ -813,7 +813,7 @@ class Humanoid(BaseTask):
         for _ in range(self.control_freq_inv):
             self.pre_physics_step(self.actions)
             self.gym.simulate(self.sim)
-            #self.gym.refresh_dof_state_tensor(self.sim)
+            self.gym.refresh_dof_state_tensor(self.sim)
 
             # to fix!
             if self.device == 'cpu':
