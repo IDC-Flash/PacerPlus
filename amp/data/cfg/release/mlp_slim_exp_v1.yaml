@@ -12,7 +12,7 @@ env:
   use_imitation_reset: true
   real_data_mesh: false
   numEnvs: 512
-  envSpacing: 0
+  envSpacing: 5
   episodeLength: 300
   isFlagrun: False
   enableDebugVis: False
