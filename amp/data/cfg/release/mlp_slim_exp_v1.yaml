@@ -135,7 +135,7 @@ params:
 
     mlp:
       units: [1024, 512]
-      activation: elu
+      activation: relu
       d2rl: False
       
       initializer:
@@ -145,7 +145,7 @@ params:
 
     disc:
       units: [1024, 512]
-      activation: elu
+      activation: relu
 
       initializer:
         name: default
