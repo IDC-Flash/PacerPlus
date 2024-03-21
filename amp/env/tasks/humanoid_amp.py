@@ -534,7 +534,6 @@ class HumanoidAMP(Humanoid):
         self.gym.refresh_force_sensor_tensor(self.sim)
         self.gym.refresh_dof_force_tensor(self.sim)
         self.gym.refresh_net_contact_force_tensor(self.sim)
-        
         if self._state_reset_happened and "_reset_dof_pos" in self.__dict__:
             # ZL: Hack to get rigidbody pos and rot to be the correct values. Needs to be called after _set_env_state
             env_ids = self._reset_ref_env_ids
