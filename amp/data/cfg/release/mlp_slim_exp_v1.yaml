@@ -101,7 +101,8 @@ sim:
     rest_offset: 0.0
     bounce_threshold_velocity: 0.5
     max_depenetration_velocity: 1.0
-    default_buffer_size_multiplier: 10.0
+    default_buffer_size_multiplier: 5
+
 
   flex:
     num_inner_iterations: 10

@@ -661,7 +661,7 @@ class Humanoid(BaseTask):
         else:
             col_group = env_id  # no inter-environment collision
 
-        col_filter = 0 # 1 for has self collision
+        col_filter = 1 # 1 for has self collision
         start_pose = gymapi.Transform()    
         char_h = 0.89
         pos = torch.tensor(get_axis_params(char_h, self.up_axis_idx)).to(self.device)
