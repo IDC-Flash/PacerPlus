@@ -38,9 +38,8 @@ env:
 
   localRootObs: True
   rootHeightObs: False
-  keyBodies: ["R_Ankle", "L_Ankle", "R_Wrist",  "L_Wrist"]
-  ampKeyBodies: ["R_Wrist",  "L_Wrist", "R_Elbow", "L_Elbow"]
-  contactBodies: ["R_Ankle", "L_Ankle", "R_Toe", "L_Toe"]
+  keyBodies: ["left_ankle_link", "right_ankle_link"]
+  ampKeyBodies: ["left_ankle_link", "right_ankle_link"]
   terminationHeight: 0.15
   enableEarlyTermination: True
   
@@ -101,7 +100,7 @@ sim:
     rest_offset: 0.0
     bounce_threshold_velocity: 0.5
     max_depenetration_velocity: 1.0
-    default_buffer_size_multiplier: 5
+    default_buffer_size_multiplier: 10
 
 
   flex:

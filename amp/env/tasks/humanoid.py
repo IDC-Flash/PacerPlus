@@ -501,6 +501,7 @@ class Humanoid(BaseTask):
         self.dof_names = self.gym.get_asset_dof_names(robot_asset)
         self.num_bodies = len(body_names)
         self.num_dofs = len(self.dof_names)
+        self.body_names = body_names
 
         stiffness = {'hip_yaw': 200,
                      'hip_roll': 200,
