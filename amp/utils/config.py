@@ -169,7 +169,8 @@ def parse_sim_params(args, cfg, cfg_train):
         sim_params.physx.use_gpu = args.use_gpu
         sim_params.physx.num_subscenes = args.subscenes
         sim_params.physx.max_gpu_contact_pairs = 32 * 1024 * 1024
-
+        sim_params.physx.bounce_threshold_velocity = 0.5 #0.5 [m/s]
+        sim_params.physx.max_depenetration_velocity = 1.0
     sim_params.use_gpu_pipeline = args.use_gpu_pipeline
     sim_params.physx.use_gpu = args.use_gpu
     
