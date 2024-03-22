@@ -150,8 +150,8 @@ params:
       initializer:
         name: default
 
-  load_checkpoint: True
-  load_path: output/mlp_slim_exp_v2/Humanoid.pth
+  load_checkpoint: False
+  #load_path: output/mlp_slim_exp_v2/Humanoid.pth
 
 
   config:
