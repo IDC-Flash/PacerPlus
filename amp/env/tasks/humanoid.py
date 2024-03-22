@@ -828,8 +828,8 @@ class Humanoid(BaseTask):
 
     def pre_physics_step(self, actions):
         #### Hz < 500 use PD control rather than torque control
-        pd_tar = self.default_dof_pos + self._pd_action_scale * actions 
-        pd_tar = torch.clamp(pd_tar, self.dof_pos_limits[:, 0], self.dof_pos_limits[:, 1])
+        pd_tar = self._pd_action_offset + self._pd_action_scale * actions 
+        #pd_tar = torch.clamp(pd_tar, self.dof_pos_limits[:, 0], self.dof_pos_limits[:, 1])
         pd_tar_tensor = gymtorch.unwrap_tensor(pd_tar)
         self.gym.set_dof_position_target_tensor(self.sim, pd_tar_tensor)
         return
