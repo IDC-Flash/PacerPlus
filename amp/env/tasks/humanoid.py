@@ -954,7 +954,7 @@ class Humanoid(BaseTask):
 
     def _reward_torque_limits(self):
         # penalize torques too close to the limit
-        torques = self.p_gains * (self.actions + self.default_dof_pos - self.dof_pos) - self.d_gains * self.dof_vel
+        torques = self.p_gains * (self.actions + - self.dof_pos) - self.d_gains * self.dof_vel
         return torch.sum((torch.abs(torques) - self.torque_limits).clip(min=0.), dim=1)
 
 
