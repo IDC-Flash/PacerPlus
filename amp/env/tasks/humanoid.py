@@ -283,14 +283,15 @@ class Humanoid(BaseTask):
         self.locomotion_reward_scales = {
             'lin_vel_z': 0.0,
             'ang_vel_xy': 0.0,
-            'orientation': -1.0,
+            'orientation':-1.0,
             'torques': -0.00001,
-            'dof_acc':  -3.5e-8,
+            'dof_acc': -3.5e-8,
             'base_height': 0.0,
             'feet_air_time': 0.0,
             'collision': 0.0,
             'action_rate': -0.01,
-            'dof_pos_limits': -10.0}
+            'dof_pos_limits': -10.0,
+            'power': -0.00001,}
         self.num_locomotion_reward = 0
         for key in self.locomotion_reward_scales.keys():
             if self.locomotion_reward_scales[key] != 0:
@@ -813,7 +814,6 @@ class Humanoid(BaseTask):
         for _ in range(self.control_freq_inv):
             self.pre_physics_step(self.actions)
             self.gym.simulate(self.sim)
-
             # to fix!
             if self.device == 'cpu':
                 self.gym.fetch_results(self.sim, True)
@@ -829,7 +829,7 @@ class Humanoid(BaseTask):
     def pre_physics_step(self, actions):
         #### Hz < 500 use PD control rather than torque control
         pd_tar = self._pd_action_offset + self._pd_action_scale * actions 
-        #pd_tar = torch.clamp(pd_tar, self.dof_pos_limits[:, 0], self.dof_pos_limits[:, 1])
+        pd_tar = torch.clamp(pd_tar, self.dof_pos_limits[:, 0], self.dof_pos_limits[:, 1])
         pd_tar_tensor = gymtorch.unwrap_tensor(pd_tar)
         self.gym.set_dof_position_target_tensor(self.sim, pd_tar_tensor)
         return
@@ -954,9 +954,13 @@ class Humanoid(BaseTask):
 
     def _reward_torque_limits(self):
         # penalize torques too close to the limit
-        torques = self.p_gains * (self.actions + - self.dof_pos) - self.d_gains * self.dof_vel
+        torques = self.p_gains * (self.actions + self.default_dof_pos - self.dof_pos) - self.d_gains * self.dof_vel
         return torch.sum((torch.abs(torques) - self.torque_limits).clip(min=0.), dim=1)
 
+
+    def _reward_power(self):
+        power = torch.abs(torch.multiply(self.dof_force_tensor, self.dof_vel)).sum(dim = -1)
+        return power
 
     def _reward_feet_air_time(self):
         # Reward long steps
@@ -989,7 +993,10 @@ class Humanoid(BaseTask):
             function = getattr(self, name)
             if scale != 0:
                 rewards.append(function() * scale)
-        return torch.stack(rewards, dim=1)
+        if self.num_locomotion_reward > 0:
+            return torch.stack(rewards, dim=1)
+        else:
+            return None
 
 #####################################################################
 ###=========================jit functions=========================###

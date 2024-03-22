@@ -98,10 +98,9 @@ sim:
     num_velocity_iterations: 0
     contact_offset: 0.02
     rest_offset: 0.0
-    bounce_threshold_velocity: 0.5
-    max_depenetration_velocity: 1.0
-    default_buffer_size_multiplier: 5
-    contact_collection: 2
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 10.0
+    default_buffer_size_multiplier: 10.0
 
 
   flex:
@@ -151,7 +150,9 @@ params:
       initializer:
         name: default
 
-  load_checkpoint: False
+  load_checkpoint: True
+  load_path: output/mlp_slim_exp_v2/Humanoid.pth
+
 
   config:
     name: Humanoid

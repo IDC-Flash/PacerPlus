@@ -412,7 +412,7 @@ class BaseTask():
                     curr_date_time = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
                     curr_video_file_name = self._video_path % curr_date_time
                     curr_states_file_name = self._states_path % curr_date_time
-                    fps = 60
+                    fps = 50
                     writer = imageio.get_writer(curr_video_file_name, fps=fps, macro_block_size=None)
                     height, width, c = self._video_queue[0].shape
                     height, width = height if height % 2 == 0 else height - 1, width if width % 2 == 0 else width - 1

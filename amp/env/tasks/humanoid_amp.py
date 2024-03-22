@@ -327,7 +327,6 @@ class HumanoidAMP(Humanoid):
     def _get_smpl_state_from_motionlib_cache(self, motion_ids, motion_times):
         motion_times = torch.clamp(motion_times, 0)
         motion_res = self._motion_lib.get_motion_state(motion_ids, motion_times)
-        #motion_res["dof_pos"] += self.default_dof_pos
         return motion_res
 
     def _sample_ref_state(self, env_ids):

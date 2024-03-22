@@ -157,6 +157,22 @@ class HumanoidTraj(humanoid_amp_task.HumanoidAMPTask):
             root_states = self._humanoid_root_states.clone()[env_ids]
 
         traj_samples = self._fetch_traj_samples(env_ids)
+        if self.cfg['env']['useExtendedTrajectoy']:
+            if (env_ids is None):
+                env_ids = torch.arange(self.num_envs, device=self.device, dtype=torch.long)
+
+            timestep_beg = self.progress_buf[env_ids] * self.dt
+            timesteps = torch.arange(self._num_traj_samples, device=self.device, dtype=torch.float)
+            timesteps = timesteps * self._traj_sample_timestep
+            traj_timesteps = timestep_beg.unsqueeze(-1) + timesteps
+            
+            time_step_for_final_velocity = torch.ones((env_ids.shape[0], 2)).to(self.device).float()
+            time_step_for_final_velocity[:, 0] *= (self.max_episode_length * self.dt - self._traj_sample_timestep)
+            time_step_for_final_velocity[:, 1] *= (self.max_episode_length * self.dt)
+            env_id_tiled = torch.broadcast_to(env_ids.unsqueeze(-1), time_step_for_final_velocity.shape)
+            last_velocity = self._traj_gen.get_velocity(env_id_tiled, time_step_for_final_velocity)
+            time_step_delta = torch.clamp(traj_timesteps -  (self.max_episode_length * self.dt), 0)
+            traj_samples += time_step_delta.unsqueeze(2) * last_velocity.unsqueeze(1)
         obs = compute_location_observations(root_states, traj_samples)
 
         return obs
@@ -181,7 +197,8 @@ class HumanoidTraj(humanoid_amp_task.HumanoidAMPTask):
         rew_buf = compute_location_reward(root_pos, tar_pos)
         locomotion_reward = self._build_locomotion_rewards()
         self.reward_raw[:, 0] = rew_buf
-        self.reward_raw[:, 1:] = locomotion_reward
+        if locomotion_reward is not None:
+            self.reward_raw[:, 1:] = locomotion_reward
         self.rew_buf = self.reward_raw.sum(dim=-1)
         return
 
