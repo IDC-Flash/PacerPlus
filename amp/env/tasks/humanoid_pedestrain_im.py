@@ -502,7 +502,7 @@ def compute_imitation_reward(root_pos, root_rot, body_pos, dof_pos, dof_vel,
     rel_root_body_pos = torch_utils.my_quat_rotate(heading_rot[:, None, :].repeat(1, J, 1).reshape(-1, 4), rel_root_body_pos)
     rel_root_body_pos = rel_root_body_pos.reshape(B, -1, 3)
     diff_body_pos = rel_root_body_pos - target_rel_root_body_pos
-    diff_body_pos_dist = (diff_body_pos ** 2).mean(dim = -1).mean(dim = -1) 
+    diff_body_pos_dist = (diff_body_pos ** 2).mean(dim = -1).mean(dim = -1) * d3_visible
      ######## use root relative position, path reward is computed in trajectory following
     r_body_pos = torch.exp(-k_pos * diff_body_pos_dist) 
 
