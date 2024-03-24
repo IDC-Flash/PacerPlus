@@ -49,6 +49,7 @@ def load_motion_from_npz(ids, motion_data_list, queue, pid):
         curr_motion = {}
         for key in data.keys():
             curr_motion[key] = torch.from_numpy(data[key])
+
         res[curr_id] = (curr_file, curr_motion)
 
     if not queue is None:
@@ -160,12 +161,12 @@ class MotionLib():
         job_args = [jobs[i] for i in range(len(jobs))]
         workers = []
         for i in range(1, len(jobs)):
-            worker_args = (*job_args[i], queue, i)
+            worker_args = (*job_args[i], queue,  i)
             worker = mp.Process(target=load_motion_from_npz,
                                 args=worker_args)
             worker.start()
             workers.append(worker)
-        res_acc.update(load_motion_from_npz(*jobs[0], None, 0))
+        res_acc.update(load_motion_from_npz(*jobs[0], None,  0))
 
         for i in tqdm(range(len(jobs) - 1)):
             res = queue.get()

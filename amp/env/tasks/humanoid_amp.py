@@ -129,6 +129,7 @@ class HumanoidAMP(Humanoid):
         self._amp_obs_demo_buf = None
         self.start = True # camera flag
         self.ref_motion_cache = {}
+        self.amp_dof_idx = [self.dof_names.index(name) for name in self._flex_dof_names]
         return
 
     def resample_motions(self):
@@ -253,7 +254,7 @@ class HumanoidAMP(Humanoid):
               motion_res["root_pos"], motion_res["root_rot"], motion_res["root_vel"], motion_res["root_ang_vel"], motion_res["dof_pos"], motion_res["dof_vel"], motion_res["key_pos"], motion_res["local_pos"]
 
 
-        amp_obs_demo = build_robot_amp_observation(root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_pos)
+        amp_obs_demo = build_robot_amp_observation(root_pos, root_rot, root_vel, root_ang_vel, dof_pos[:, self.amp_dof_idx], dof_vel[:, self.amp_dof_idx], key_pos)
         return amp_obs_demo
 
     def _build_amp_obs_demo_buf(self, num_samples):
@@ -327,6 +328,16 @@ class HumanoidAMP(Humanoid):
     def _get_smpl_state_from_motionlib_cache(self, motion_ids, motion_times):
         motion_times = torch.clamp(motion_times, 0)
         motion_res = self._motion_lib.get_motion_state(motion_ids, motion_times)
+
+        if self.has_hand_dof:
+            dof_pos = torch.zeros(motion_res["dof_pos"].shape[0], motion_res["dof_pos"].shape[1]+2, device=self.device)
+            dof_pos[:, self.amp_dof_idx] = motion_res["dof_pos"]
+            motion_res["dof_pos"] = dof_pos
+
+            dof_vel = torch.zeros(motion_res["dof_vel"].shape[0],motion_res["dof_vel"].shape[1]+2, device=self.device)
+            dof_vel[:, self.amp_dof_idx] = motion_res["dof_vel"]
+            motion_res["dof_vel"] = dof_vel
+
         return motion_res
 
     def _sample_ref_state(self, env_ids):
@@ -450,7 +461,7 @@ class HumanoidAMP(Humanoid):
         root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_pos, local_pos = \
               motion_res["root_pos"], motion_res["root_rot"], motion_res["root_vel"], motion_res["root_ang_vel"], motion_res["dof_pos"], motion_res["dof_vel"], motion_res["key_pos"], motion_res["local_pos"]
 
-        amp_obs_demo = build_robot_amp_observation(root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_pos)
+        amp_obs_demo = build_robot_amp_observation(root_pos, root_rot, root_vel, root_ang_vel, dof_pos[:, self.amp_dof_idx], dof_vel[:, self.amp_dof_idx], key_pos)
 
 
         self._hist_amp_obs_buf[env_ids] = amp_obs_demo.view(self._hist_amp_obs_buf[env_ids].shape)
@@ -520,8 +531,8 @@ class HumanoidAMP(Humanoid):
             root_vel = self._humanoid_root_states[:, 7:10].clone()
             root_ang_vel = self._humanoid_root_states[:, 10:13].clone()
             key_body_pos = self._rigid_body_pos[:, self.amp_key_pos_id].clone()
-            dof_pos = self.dof_pos.clone()
-            dof_vel = self.dof_vel.clone()
+            dof_pos = self.dof_pos[:, self.amp_dof_idx].clone()
+            dof_vel = self.dof_vel[:, self.amp_dof_idx].clone()
             self._curr_amp_obs_buf[:] = build_robot_amp_observation(
                     root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos)
         elif len(env_ids) == 0:
@@ -529,8 +540,8 @@ class HumanoidAMP(Humanoid):
         else:
             root_pos = self._base_pos[env_ids].clone()
             root_rot = self._base_quat[env_ids].clone()
-            dof_pos = self.dof_pos[env_ids].clone()
-            dof_vel = self.dof_vel[env_ids].clone()
+            dof_pos = self.dof_pos[env_ids][:, self.amp_dof_idx].clone()
+            dof_vel = self.dof_vel[env_ids][:, self.amp_dof_idx].clone()
             root_vel = self._humanoid_root_states[env_ids, 7:10].clone()
             root_ang_vel = self._humanoid_root_states[env_ids, 10:13].clone()
             key_body_pos = self._rigid_body_pos[env_ids][:, self.amp_key_pos_id].clone()

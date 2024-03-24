@@ -53,18 +53,17 @@ env:
   enableTaskObs: True
 
   reward_specs:
-    k_pos: 100
-    k_rot: 10
-    k_vel: 0.1
-    k_dof: 60
+    k_pos: 20
+    k_vel: 0.02
+    k_dof: 20
     w_pos: 0.2
-    w_rot: 0.1
-    w_dof: 0.6
+    w_dof: 0.7
     w_vel: 0.1
+
 
   asset:
     assetRoot: "/"
-    assetFileName: "amp/data/robot/h1_update/urdf/h1.urdf"
+    assetFileName: "amp/data/robot/h1_update/urdf/h1_imitation.urdf"
 
   terrain:
     terrainType: trimesh # none, plane, or trimesh

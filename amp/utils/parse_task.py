@@ -11,6 +11,7 @@ from env.tasks.humanoid_view_motion import HumanoidViewMotion
 from env.tasks.humanoid_amp_task import HumanoidAMPTask
 from env.tasks.humanoid_traj import HumanoidTraj
 from env.tasks.humanoid_pedestrian import HumanoidPedestrian
+from env.tasks.humanoid_pedestrain_im import HumanoidPedestrianIm
 from env.tasks.humanoid_pedestrain_terrain import HumanoidPedestrianTerrain
 from amp.env.tasks.humanoid_pedestrain_terrain_im import HumanoidPedestrianTerrainIm
 from env.tasks.vec_task_wrappers import VecTaskPythonWrapper

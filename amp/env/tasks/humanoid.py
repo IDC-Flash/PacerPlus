@@ -203,16 +203,18 @@ class Humanoid(BaseTask):
            'left_shoulder_roll_joint' : 0, 
            'left_shoulder_yaw_joint' : 0.,
            'left_elbow_joint'  : 0.,
+           'left_hand_joint': 0.,
            'right_shoulder_pitch_joint' : 0.,
            'right_shoulder_roll_joint' : 0.0,
            'right_shoulder_yaw_joint' : 0.,
            'right_elbow_joint' : 0.,
+            'right_hand_joint': 0.,
         }
         # joint positions offsets and PD gains
         for i in range(self.num_dofs):
             name = self.dof_names[i]
             angle = default_joint_angles[name]
-            self.default_dof_pos[i] = angle
+            self.default_dof_pos[i] = angle 
 
             found = False
             for dof_name in self.stiffness.keys():
@@ -277,7 +279,10 @@ class Humanoid(BaseTask):
 
 
         self._body_names = self._body_names_orig
-        self._dof_names = self._body_names[1:]
+        self._flex_dof_names = ['left_hip_yaw_joint', 'left_hip_roll_joint', 'left_hip_pitch_joint', 'left_knee_joint', 'left_ankle_joint', 
+                           'right_hip_yaw_joint', 'right_hip_roll_joint', 'right_hip_pitch_joint', 'right_knee_joint', 'right_ankle_joint',
+                            'torso_joint', 'left_shoulder_pitch_joint', 'left_shoulder_roll_joint', 'left_shoulder_yaw_joint', 'left_elbow_joint', 
+                            'right_shoulder_pitch_joint', 'right_shoulder_roll_joint', 'right_shoulder_yaw_joint', 'right_elbow_joint']
  
 
         self.locomotion_reward_scales = {
@@ -447,9 +452,10 @@ class Humanoid(BaseTask):
 
     def _setup_character_props(self, key_bodies):
         self._dof_body_ids = np.arange(1, len(self._body_names))
-        self._dof_offsets = np.linspace(0, len(self._dof_names), len(self._body_names)).astype(int)
-        self._num_actions = 19
-        self._num_self_obs = 66
+        self._dof_offsets = np.linspace(0, len(self._flex_dof_names), len(self._body_names)).astype(int)
+        self._num_actions = 19 if 'imitation' not in self.cfg["env"]["asset"]["assetFileName"] else 21
+        self._num_self_obs = 66 if 'imitation' not in self.cfg["env"]["asset"]["assetFileName"] else 72
+        self.has_hand_dof = False if 'imitation' not in self.cfg["env"]["asset"]["assetFileName"] else True
         return
 
     def _build_termination_heights(self):
