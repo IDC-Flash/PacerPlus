@@ -55,7 +55,7 @@ env:
   reward_specs:
     k_pos: 20
     k_vel: 0.02
-    k_dof: 1
+    k_dof: 5
     w_pos: 0.2
     w_dof: 0.7
     w_vel: 0.1
