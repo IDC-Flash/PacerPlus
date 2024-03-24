@@ -54,7 +54,7 @@ class HumanoidPedestrianIm(humanoid_traj.HumanoidTraj):
             "reward_specs", {
                 "k_pos": 20,
                 "k_vel": 0.02,
-                "k_dof": 20,
+                "k_dof": 5,
                 "w_pos": 0.2,
                 "w_vel": 0.1,
                 "w_dof": 0.7,
@@ -485,7 +485,7 @@ def compute_imitation_reward(root_pos, root_rot, body_pos, dof_pos, dof_vel,
     # dof rot reward
     diff_dof_obs = dof_pos - ref_dof_pos
     diff_dof_obs_dist = (diff_dof_obs ** 2).mean(dim=-1) * d3_visible
-    r_dof = torch.exp(-k_pos * diff_dof_obs_dist) 
+    r_dof = torch.exp(-k_dof * diff_dof_obs_dist) 
 
     # body position reward
     heading_rot, heading = torch_utils.calc_heading_quat_inv_with_heading(root_rot)
