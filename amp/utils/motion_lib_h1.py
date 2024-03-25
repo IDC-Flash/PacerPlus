@@ -37,6 +37,8 @@ if not USE_CACHE:
     torch.Tensor.numpy = Patch.numpy
 
 
+link_pos_filter = [i for i in range(0, 12)] + [i for i in range(13, 18)] + [i for i in range(19, 24)]
+
 
 def load_motion_from_npz(ids, motion_data_list, queue, pid):
     # ZL: loading motion with the specified skeleton. Perfoming forward kinematics to get the joint positions
@@ -49,7 +51,7 @@ def load_motion_from_npz(ids, motion_data_list, queue, pid):
         curr_motion = {}
         for key in data.keys():
             curr_motion[key] = torch.from_numpy(data[key])
-
+        curr_motion['link_location'] = curr_motion['link_location'][:, link_pos_filter]
         res[curr_id] = (curr_file, curr_motion)
 
     if not queue is None:

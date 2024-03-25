@@ -62,8 +62,8 @@ class HumanoidPedestrianIm(humanoid_traj.HumanoidTraj):
         print("Reward specs: ", self.reward_specs)
         self.task_reward_specs = cfg["env"].get(
             "task_reward_specs", {
-                "w_location": 0.5,
-                "w_imitation": 0.5,
+                "w_location": 0.7,
+                "w_imitation": 0.3,
             }
         )
 
@@ -73,8 +73,8 @@ class HumanoidPedestrianIm(humanoid_traj.HumanoidTraj):
         self.imitation_ref_motion_cache = {}
         self.d3_visible = torch.zeros((self.num_envs), dtype=torch.int, device=self.device)
         self.im_ref_rb_target_pos = torch.zeros((self.num_envs, self.num_bodies, 3), device=self.device).float()
-        self._track_bodies_id = [i for i in range(11, 22)]
-        self._dof_track_bodies_id = [i for i in range(10, 15)] + [i for i in range(16, 20)]
+        self._track_bodies_id = [i for i in range(12, 22)]
+        self._dof_track_bodies_id = [i for i in range(11, 15)] + [i for i in range(16, 20)]
 
 
     def post_physics_step(self):
@@ -95,7 +95,7 @@ class HumanoidPedestrianIm(humanoid_traj.HumanoidTraj):
         obs_size = 0
         if (self._enable_task_obs):
             obs_size = 2 * self._num_traj_samples
-            obs_size += 42 + 1
+            obs_size += 38 + 1
         return obs_size
     
     def get_task_obs_size_detail(self):
@@ -425,7 +425,7 @@ def get_euler_xyz(q):
 
     return torch.stack((roll, pitch, yaw), dim=-1)
 
-@torch.jit.script
+#@torch.jit.script
 def compute_imitation_observations(root_pos, root_rot, body_pos,  body_dof, 
                                    ref_root_pos, ref_root_rot, ref_body_pos,
                                      ref_body_dof, d3_observation, time_steps, upright):

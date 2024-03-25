@@ -16,7 +16,7 @@ env:
   episodeLength: 300
   isFlagrun: False
   enableDebugVis: False
-  terminate_dist: 0.25
+  terminate_dist: 0.5
   reset_buffer: 10
 
   sensor_extent: 4
