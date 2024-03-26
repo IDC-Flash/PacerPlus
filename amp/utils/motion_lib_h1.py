@@ -52,6 +52,11 @@ def load_motion_from_npz(ids, motion_data_list, queue, pid):
         for key in data.keys():
             curr_motion[key] = torch.from_numpy(data[key])
         curr_motion['link_location'] = curr_motion['link_location'][:, link_pos_filter]
+        B, J, _ = curr_motion['link_location'].shape
+        rot = torch.tensor([ 0, 0, -0.7071068, 0.7071068 ], dtype=torch.float32)[None, None, :]
+        ref_body_pos= curr_motion['link_location']
+        ref_body_pos = torch_utils.my_quat_rotate(rot.repeat(B, J, 1).reshape(-1, 4), ref_body_pos.reshape(-1, 3)).reshape(B, J, 3)
+        curr_motion['link_location'] = ref_body_pos
         res[curr_id] = (curr_file, curr_motion)
 
     if not queue is None:
@@ -115,7 +120,7 @@ class MotionLib():
     def load_motions(self, num_envs, random_sample = True, start_idx = 0):
         # load motion load the same number of motions as there are skeletons (humanoids)
         if "gts" in self.__dict__:
-            del self.gts , self.grs , self.lrs, self.grvs, self.gravs , self.gvs, self.dvs,
+            del self.gts , self.grs , self.lrs, self.grvs, self.gravs , self.dvs,
             del  self._motion_lengths, self._motion_fps, self._motion_dt, self._motion_num_frames, self._motion_bodies, self._motion_aa , self._motion_quat
 
         motions = []

@@ -39,7 +39,8 @@ class HumanoidPedestrianIm(humanoid_traj.HumanoidTraj):
 
         self.different_motion_file = cfg["env"].get("different_motion_file", True)
         self.reset_buffer = cfg["env"].get("reset_buffer", 0)
-
+        self._track_bodies_id = [i for i in range(12, 22)]
+        self._dof_track_bodies_id = [i for i in range(11, 15)] + [i for i in range(16, 20)]
         #### input tracking mask into the observation
         if not cfg['args'].headless:
             self._infilling_handles = [[] for _ in range(cfg['args'].num_envs)]
@@ -67,15 +68,15 @@ class HumanoidPedestrianIm(humanoid_traj.HumanoidTraj):
             }
         )
 
-        if not self.headless:
-            self._build_infilling_marker_state_tensors()
+
 
         self.imitation_ref_motion_cache = {}
         self.d3_visible = torch.zeros((self.num_envs), dtype=torch.int, device=self.device)
         self.im_ref_rb_target_pos = torch.zeros((self.num_envs, self.num_bodies, 3), device=self.device).float()
-        self._track_bodies_id = [i for i in range(12, 22)]
-        self._dof_track_bodies_id = [i for i in range(11, 15)] + [i for i in range(16, 20)]
 
+
+        if not self.headless:
+            self._build_infilling_marker_state_tensors()
 
     def post_physics_step(self):
         super().post_physics_step()
@@ -108,7 +109,7 @@ class HumanoidPedestrianIm(humanoid_traj.HumanoidTraj):
 
     def _update_marker(self):
         env_ids = torch.arange(self.num_envs).to(self.device)
-        self._infilling_pos[:] = self.im_ref_rb_target_pos.clone()
+        self._infilling_pos[:] = self.im_ref_rb_target_pos[:, self._track_bodies_id].clone() + self._humanoid_root_states[..., 0:3].unsqueeze(1)
         traj_samples = self._fetch_traj_samples()
         self._marker_pos[:] = traj_samples
         self._marker_pos[..., 2] = self._humanoid_root_states[..., 2:3]  # jp hack # ZL hack
@@ -132,7 +133,7 @@ class HumanoidPedestrianIm(humanoid_traj.HumanoidTraj):
     
     def _build_infilling_marker(self, env_id, env_ptr):
         default_pose = gymapi.Transform()
-        for i in range(self._num_joints):
+        for i in range(len(self._track_bodies_id)):
             marker_handle = self.gym.create_actor(env_ptr, self._marker_asset, default_pose, "marker", self.num_envs + 5, 1, 0)
             self.gym.set_rigid_body_color(env_ptr, marker_handle, 0, gymapi.MESH_VISUAL, gymapi.Vec3(0.0, 0.8, 0.0))
             self._infilling_handles[env_id].append(marker_handle)
@@ -143,7 +144,7 @@ class HumanoidPedestrianIm(humanoid_traj.HumanoidTraj):
         num_actors = self._root_states.shape[0] // self.num_envs
         self._infilling_states = self._root_states.view(
             self.num_envs, num_actors,
-            self._root_states.shape[-1])[..., 11:(11 + self._num_joints), :]
+            self._root_states.shape[-1])[..., 11:(11 + len(self._track_bodies_id)), :]
         self._infilling_pos = self._infilling_states[..., :3]
         self._infilling_actor_ids = self._humanoid_actor_ids.unsqueeze(-1) + to_torch(self._infilling_handles, dtype=torch.int32, device=self.device)
         self._infilling_actor_ids = self._infilling_actor_ids.flatten()
@@ -238,7 +239,6 @@ class HumanoidPedestrianIm(humanoid_traj.HumanoidTraj):
             mask = ((self.progress_buf[env_ids] + 1) >= ref_start[env_ids]) & ((self.progress_buf[env_ids] + 1) < ref_start[env_ids] + ref_length[env_ids])
             d3_visible[mask] = 1
             self.d3_visible[env_ids] = d3_visible
-            self._target_dof_pos[env_ids] = dof_pos
 
 
     def _compute_task_obs(self, env_ids=None):
@@ -298,7 +298,19 @@ class HumanoidPedestrianIm(humanoid_traj.HumanoidTraj):
 
         ########### update for visualization
         if flags.test:  
-            self.im_ref_rb_target_pos[env_ids] = ref_rb_pos.clone()
+            # rotate
+            ref_heading_rot, heading = torch_utils.calc_heading_quat_inv_with_heading(ref_root_rot)
+            B, J, _ = body_pos.shape
+            ref_body_pos = ref_rb_pos.clone()
+            ref_body_pos = ref_body_pos.reshape(-1, 3)
+            # rot = torch.tensor([ 0, 0, -0.7071068, 0.7071068 ], device=self.device, dtype=torch.float32)[None, None, :]
+            # ref_body_pos = torch_utils.my_quat_rotate(rot.repeat(1, J, 1).reshape(-1, 4), ref_body_pos)
+            ref_body_pos = torch_utils.my_quat_rotate(ref_heading_rot[:, None, :].repeat(1, J, 1).reshape(-1, 4), ref_body_pos)
+            heading = torch_utils.calc_heading_quat(root_rot)
+            ref_body_pos = torch_utils.my_quat_rotate(heading[:, None, :].repeat(1, J, 1).reshape(-1, 4), ref_body_pos)
+            ref_body_pos = ref_body_pos.reshape(B, -1, 3)
+            self.im_ref_rb_target_pos[env_ids] = ref_body_pos.clone()
+            self.im_ref_rb_target_pos[:, 0] *= -1
         return obs
 
 
