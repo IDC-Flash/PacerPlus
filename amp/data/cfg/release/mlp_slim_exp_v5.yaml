@@ -1,0 +1,211 @@
+# if given, will override the device setting in gym. 
+notes:  "Capsual Model, rotation amp observation, large data, big ankle, Terrain"
+project_name: "crossroad_smpl"
+env:
+  motion_file: data/h1_data/run_train
+  imitation_motion_file: data/h1_data/h1_full_train
+
+  terrain_obs: True
+  terrain_obs_type: "square_fov"
+  terrain_obs_root: "pelvis"
+  use_center_height: true
+  use_imitation_reset: true
+  real_data_mesh: false
+  numEnvs: 512
+  envSpacing: 5
+  episodeLength: 300
+  isFlagrun: False
+  enableDebugVis: False
+  terminate_dist: 0.3
+  reset_buffer: 10
+
+  sensor_extent: 4
+  sensor_res: 64
+  divide_group: False
+  group_obs: False
+  num_env_group: 512
+  velocity_map: False
+
+  power_reward: True
+  has_shape_variation: False
+
+  powerScale: 1.0
+  controlFrequencyInv: 4 # 50 Hz
+  stateInit: "Random"
+  hybridInitProb: 0.5
+  numAMPObsSteps: 20
+
+
+  localRootObs: True
+  rootHeightObs: False
+  keyBodies: ["left_ankle_link", "right_ankle_link"]
+  ampKeyBodies: ["left_ankle_link", "right_ankle_link"]
+  terminationHeight: 0.15
+  enableEarlyTermination: True
+  
+  numTrajSamples: 10
+  trajSampleTimestep: 0.5
+  speedMin: 0
+  speedMax: 2.0
+  accelMax: 1.0
+  sharpTurnProb: 0.02
+  useExtendedTrajectoy: True
+  enableTaskObs: True
+
+  reward_specs:
+    k_pos: 10
+    k_vel: 0.02
+    k_dof: 5
+    w_pos: 0.3
+    w_dof: 0.6
+    w_vel: 0.1
+
+  task_reward_specs:
+    w_location: 0.5
+    w_imitation: 0.5
+
+
+  asset:
+    assetRoot: "/"
+    assetFileName: "amp/data/robot/h1_update/urdf/h1_imitation.urdf"
+
+  terrain:
+    terrainType: trimesh # none, plane, or trimesh
+    staticFriction: 1.0  # [-]
+    dynamicFriction: 1.0  # [-]
+    restitution: 0.        # [-]
+    # rough terrain only:
+    curriculum: true
+    maxInitMapLevel: 0
+    mapLength: 20.
+    mapWidth: 20.
+    numLevels: 5
+    numTerrains: 20
+    # terrain types: [smooth slope, rough slope, stairs up, stairs down, discrete, stepping, poles, flat]
+    #terrainProportions: [0.1, 0.1, 0.35, 0.25, 0.2, 0., 0., 0.1]
+    terrainProportions: [0, 0, 0, 0, 0., 0., 0., 0.1]
+    # tri mesh only:
+    slopeTreshold: 0.9
+    
+  plane:
+    staticFriction: 1.0
+    dynamicFriction: 1.0
+    restitution: 0.0
+
+sim:
+  substeps: 2
+  physx:
+    num_threads: 4
+    solver_type: 1  # 0: pgs, 1: tgs
+    num_position_iterations: 4
+    num_velocity_iterations: 0
+    contact_offset: 0.02
+    rest_offset: 0.0
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 10.0
+    default_buffer_size_multiplier: 10.0
+
+
+  flex:
+    num_inner_iterations: 10
+    warm_start: 0.25
+
+
+params:
+  seed: 0
+
+  algo:
+    name: amp_continuous
+
+  model:
+    name: continuous_amp
+
+  network:
+    name: amp
+    separate: True
+
+    space:
+      continuous:
+        mu_activation: None
+        sigma_activation: None
+        mu_init:
+          name: default
+        sigma_init:
+          name: const_initializer
+          val: -2.9
+        fixed_sigma: True
+        learn_sigma: False
+
+    mlp:
+      units: [1024, 512]
+      activation: relu
+      d2rl: False
+      
+      initializer:
+        name: default
+      regularizer:
+        name: None
+
+    disc:
+      units: [1024, 512]
+      activation: relu
+
+      initializer:
+        name: default
+
+  load_checkpoint: False
+  #load_path: output/mlp_slim_exp_v2/Humanoid.pth
+
+
+  config:
+    name: Humanoid
+    env_name: rlgpu
+    multi_gpu: False
+    ppo: True
+    mixed_precision: False
+    normalize_input: True
+    normalize_value: True
+    reward_shaper:
+      scale_value: 1
+    normalize_advantage: True
+    gamma: 0.99
+    tau: 0.95
+    learning_rate: 2e-5
+    lr_schedule: constant
+    score_to_win: 20000
+    max_epochs: 10000000
+    save_best_after: 50
+    save_frequency: 250
+    print_stats: False
+    save_intermediate: True
+    entropy_coef: 0.0
+    truncate_grads: True
+    grad_norm: 50.0
+    ppo: True
+    e_clip: 0.2
+    horizon_length: 32
+    minibatch_size: 16384
+    mini_epochs: 6
+    critic_coef: 5
+    clip_value: False
+    seq_len: 4
+    bounds_loss_coef: 10
+    amp_obs_demo_buffer_size: 200000
+    amp_replay_buffer_size: 200000
+    amp_replay_keep_prob: 0.01
+    amp_batch_size: 512
+    amp_minibatch_size: 4096
+    disc_coef: 5
+    disc_logit_reg: 0.01
+    disc_grad_penalty: 1.0
+    disc_reward_scale: 2
+    disc_weight_decay: 0.0001
+    normalize_amp_input: True
+
+    task_reward_w: 0.5
+    disc_reward_w: 0.5
+
+    amp_dropout: False
+    player: 
+      games_num: 50000000
+      print_stats: False

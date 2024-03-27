@@ -15,14 +15,12 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
         self._normalize_amp_input = config.get('normalize_amp_input', True)
         self._normalize_input = config['normalize_input']
         self._disc_reward_scale = config['disc_reward_scale']
-
         super().__init__(config)
         self.export_motion = self.task.cfg['args'].export_motion
-        # self.env.task.update_value_func(self._eval_critic, self._eval_actor)
         humanoid_env = self.env.task
         self.export_motion = self.task.cfg['args'].export_motion
-        if hasattr(humanoid_env,'terminate_dist'):
-            humanoid_env.terminate_dist *= 2 # ZL Hack: use test 
+        # if hasattr(humanoid_env,'terminate_dist'):
+        #     humanoid_env.terminate_dist *= 2 # ZL Hack: use test 
         return
 
     def restore(self, fn):

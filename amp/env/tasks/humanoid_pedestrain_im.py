@@ -73,6 +73,7 @@ class HumanoidPedestrianIm(humanoid_traj.HumanoidTraj):
         self.imitation_ref_motion_cache = {}
         self.d3_visible = torch.zeros((self.num_envs), dtype=torch.int, device=self.device)
         self.im_ref_rb_target_pos = torch.zeros((self.num_envs, self.num_bodies, 3), device=self.device).float()
+        self.target_dof = torch.zeros((self.num_envs, self.num_dofs), device=self.device).float()
 
 
         if not self.headless:
@@ -239,7 +240,18 @@ class HumanoidPedestrianIm(humanoid_traj.HumanoidTraj):
             mask = ((self.progress_buf[env_ids] + 1) >= ref_start[env_ids]) & ((self.progress_buf[env_ids] + 1) < ref_start[env_ids] + ref_length[env_ids])
             d3_visible[mask] = 1
             self.d3_visible[env_ids] = d3_visible
+            self.target_dof[env_ids] = dof_pos.clone()
 
+    # def pre_physics_step(self, actions):
+    #     #### Hz < 500 use PD control rather than torque control
+    #     pd_tar = self._pd_action_offset + self._pd_action_scale * actions 
+    #     pd_tar = torch.clamp(pd_tar, self.dof_pos_limits[:, 0], self.dof_pos_limits[:, 1])
+    #     if self.d3_visible.sum() > 0:
+    #         pd_tar[self.d3_visible==1, self._dof_track_bodies_id] = self.target_dof[self.d3_visible==1, self._dof_track_bodies_id]
+
+    #     pd_tar_tensor = gymtorch.unwrap_tensor(pd_tar)
+    #     self.gym.set_dof_position_target_tensor(self.sim, pd_tar_tensor)
+    #     return
 
     def _compute_task_obs(self, env_ids=None):
         # Compute task observations (terrain, trajectory, self state)
