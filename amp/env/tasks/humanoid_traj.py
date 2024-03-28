@@ -6,7 +6,7 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 import torch
-
+import json
 import env.tasks.humanoid_amp_task as humanoid_amp_task
 import env.util.traj_generator as traj_generator
 
@@ -29,7 +29,9 @@ class HumanoidTraj(humanoid_amp_task.HumanoidAMPTask):
         self._sharp_turn_prob = cfg["env"]["sharpTurnProb"]
 
         self._fail_dist = 4.0
-
+        self.realTrajPath = cfg['env'].get("realTrajPath", None)
+        if self.realTrajPath is not None:
+            self.real_traj = self._load_real_traj(self.realTrajPath)
         super().__init__(cfg=cfg,
                          sim_params=sim_params,
                          physics_engine=physics_engine,
@@ -104,6 +106,16 @@ class HumanoidTraj(humanoid_amp_task.HumanoidAMPTask):
 
         return
 
+    def _load_real_traj(self, real_traj_path):
+        real_traj_path = '/home/admin1/workspace/idc-flash/pacerplus/trajectory.json'
+        with open(real_traj_path, 'r') as f:
+            path = json.load(f)
+
+        path_xy = np.array(path)
+        path = np.zeros((path_xy.shape[0],3))
+        path[:, :2] = path_xy
+        return path
+    
     def _build_traj_generator(self):
         num_envs = self.num_envs
         episode_dur = self.max_episode_length * self.dt
@@ -118,6 +130,8 @@ class HumanoidTraj(humanoid_amp_task.HumanoidAMPTask):
         root_pos = self._base_pos[:, 0:3]
         self._traj_gen.reset(env_ids, root_pos)
 
+        if self.realTrajPath is not None:
+            self._traj_gen = traj_generator.RealTrajGenerator(self.num_envs, self.real_traj, origin_fps=50, device=self.device)
         return
 
     def _build_marker(self, env_id, env_ptr):
@@ -142,7 +156,41 @@ class HumanoidTraj(humanoid_amp_task.HumanoidAMPTask):
         self._traj_marker_actor_ids = self._traj_marker_actor_ids.flatten()
 
         return
+    
+    def _reset_ref_state_init(self, env_ids):
+        num_envs = env_ids.shape[0]
+        motion_ids, motion_times, root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, key_pos, local_pos = self._sample_ref_state(env_ids)
 
+        if flags.debug:
+            root_pos[..., 2] += 0.5
+
+        if flags.fixed:
+            x_grid, y_grid = torch.meshgrid(torch.arange(64), torch.arange(64))
+            root_pos[:, 0], root_pos[:, 1] = x_grid.flatten()[env_ids] * 2, y_grid.flatten()[env_ids] * 2
+
+        root_pos[:, 2] += 1.1
+        if self.realTrajPath is not None:
+            root_pos[: , :2] = torch.tensor(self.real_traj[:1, :2]).to(self.device).float()
+        # if flags.test:
+        #     dof_pos = self.default_dof_pos
+
+        self._set_env_state(env_ids=env_ids,
+                            root_pos=root_pos,
+                            root_rot=root_rot,
+                            dof_pos=dof_pos,
+                            root_vel=root_vel,
+                            root_ang_vel=root_ang_vel,
+                            dof_vel=dof_vel)
+
+        self._reset_ref_env_ids = env_ids
+        self._reset_ref_motion_ids = motion_ids
+        self._reset_ref_motion_times = motion_times
+        self._motion_start_times[env_ids] = motion_times
+        self._sampled_motion_ids[env_ids] = motion_ids
+        if flags.follow:
+            self.start = True  ## Updating camera when reset
+        return
+    
     def _reset_task(self, env_ids):
         super()._reset_task(env_ids)
 

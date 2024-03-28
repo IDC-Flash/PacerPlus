@@ -13,7 +13,7 @@ env:
   real_data_mesh: false
   numEnvs: 512
   envSpacing: 5
-  episodeLength: 300
+  episodeLength: 1000
   isFlagrun: False
   enableDebugVis: False
   terminate_dist: 0.25

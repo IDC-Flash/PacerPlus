@@ -453,3 +453,62 @@ class HybirdTrajGenerator():
 
         self.traj_position_flat = self.traj_position.reshape(-1, 3)
         return
+    
+
+
+class RealTrajGenerator():
+    def __init__(self, num_envs, trajectory, origin_fps, device):
+        self._device = device
+        self._dt = 1.0 / origin_fps
+        self._verts_flat = torch.from_numpy(trajectory).to(self._device).float().reshape(-1, 3)
+        self._verts = self._verts_flat.view((num_envs, -1, 3))
+    
+    def reset(self, env_ids, init_pos):
+        pass
+        
+
+    def get_num_verts(self):
+        return self._verts.shape[1]
+
+    def get_num_segs(self):
+        return self.get_num_verts() - 1
+
+    def get_num_envs(self):
+        return self._verts.shape[0]
+
+    def get_traj_duration(self):
+        num_verts = self.get_num_verts()
+        dur = num_verts * self._dt
+        return  dur
+
+    def get_traj_verts(self, traj_id):
+        return self._verts[traj_id]
+
+    def calc_pos(self, traj_ids, times):
+        traj_dur = self.get_traj_duration()
+        num_verts = self.get_num_verts()
+        num_segs = self.get_num_segs()
+
+        traj_phase = torch.clip(times / traj_dur, 0.0, 1.0)
+        seg_idx = traj_phase * num_segs
+        seg_id0 = torch.floor(seg_idx).long()
+        seg_id1 = torch.ceil(seg_idx).long()
+        lerp = seg_idx - seg_id0
+
+        pos0 = self._verts_flat[traj_ids * num_verts + seg_id0]
+        pos1 = self._verts_flat[traj_ids * num_verts + seg_id1]
+
+        lerp = lerp.unsqueeze(-1)
+        pos = (1.0 - lerp) * pos0 + lerp * pos1
+        return pos
+    
+    def get_velocity(self, traj_ids, times):
+        pos_total = self.calc_pos(traj_ids.flatten(), times.flatten())
+        pos_total = pos_total.reshape(traj_ids.shape[0], times.shape[1], pos_total.shape[1])
+        pos = pos_total[:, 0]
+        pos_next = pos_total[:, -1]
+        vel = (pos_next - pos) / (times[:, -1] - times[:, 0]).unsqueeze(-1)
+        return vel
+    
+    def get_init_pos(self, traj_ids):
+        return self.calc_pos(traj_ids, torch.zeros_like(traj_ids, device=self._device))

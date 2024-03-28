@@ -18,7 +18,6 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
         super().__init__(config)
         self.export_motion = self.task.cfg['args'].export_motion
         humanoid_env = self.env.task
-        self.export_motion = self.task.cfg['args'].export_motion
         # if hasattr(humanoid_env,'terminate_dist'):
         #     humanoid_env.terminate_dist *= 2 # ZL Hack: use test 
         return
@@ -270,27 +269,16 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
             done_indices = []
 
             if self.export_motion:
-                root_pos, root_rot, dof_pos, physics_kp, trajectory_target, \
-                      imitation_target, d3_visible, tracking_mask, body_shape  = self.task.get_current_pose()
+                root_pos, root_rot, dof_pos = self.task.get_current_pose()
                 root_pos_all = root_pos.unsqueeze(1)
                 root_rot_all = root_rot.unsqueeze(1)
                 dof_pos_all = dof_pos.unsqueeze(1)
-                physics_kp = physics_kp.unsqueeze(1)
-                trajectory_target = trajectory_target.unsqueeze(1)
-                imitation_target = imitation_target.unsqueeze(1)
-                d3_visible = d3_visible.unsqueeze(1)
-                tracking_mask = tracking_mask.unsqueeze(1)
                 for i in range(all_num_envs):
                     if  dump_dict[i]['done'] == 0:
                         dump_dict[i]['info']['root_pos_all'] = root_pos_all[i:i+1]
                         dump_dict[i]['info']['root_rot_all'] = root_rot_all[i:i+1]
                         dump_dict[i]['info']['dof_pos_all'] = dof_pos_all[i:i+1]
-                        dump_dict[i]['info']['physics_kp_all'] = physics_kp[i:i+1]
-                        dump_dict[i]['info']['body_shape'] = body_shape[i:i+1]
-                        dump_dict[i]['info']['trajectory_target'] = trajectory_target[i:i+1]
-                        dump_dict[i]['info']['imitation_target'] = imitation_target[i:i+1]
-                        dump_dict[i]['info']['d3_visible'] = d3_visible[i:i+1]
-                        dump_dict[i]['info']['tracking_mask'] = tracking_mask[i:i+1]
+
 
 
             with torch.no_grad():
@@ -319,18 +307,13 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
                     games_played += done_count
 
                     if self.export_motion:
-                        root_pos, root_rot, dof_pos, physics_kp, trajectory_target, \
-                            imitation_target, d3_visible, tracking_mask, body_shape  = self.task.get_current_pose()
+                        root_pos, root_rot, dof_pos = self.task.get_current_pose()
                         for i in range(all_num_envs):
                             if  dump_dict[i]['done'] == 0:
                                 dump_dict[i]['info']['root_pos_all'] = torch.cat([dump_dict[i]['info']['root_pos_all'], root_pos.unsqueeze(1)[i:i+1]], dim=1)
                                 dump_dict[i]['info']['root_rot_all'] = torch.cat([dump_dict[i]['info']['root_rot_all'], root_rot.unsqueeze(1)[i:i+1]], dim=1)
                                 dump_dict[i]['info']['dof_pos_all'] = torch.cat([dump_dict[i]['info']['dof_pos_all'], dof_pos.unsqueeze(1)[i:i+1]], dim=1)
-                                dump_dict[i]['info']['physics_kp_all'] = torch.cat([dump_dict[i]['info']['physics_kp_all'], physics_kp.unsqueeze(1)[i:i+1]], dim=1)
-                                dump_dict[i]['info']['trajectory_target'] = torch.cat([dump_dict[i]['info']['trajectory_target'], trajectory_target.unsqueeze(1)[i:i+1]], dim=1)
-                                dump_dict[i]['info']['imitation_target'] = torch.cat([dump_dict[i]['info']['imitation_target'], imitation_target.unsqueeze(1)[i:i+1]], dim=1)
-                                dump_dict[i]['info']['d3_visible'] = torch.cat([dump_dict[i]['info']['d3_visible'], d3_visible.unsqueeze(1)[i:i+1]], dim=1)
-                                dump_dict[i]['info']['tracking_mask'] = torch.cat([dump_dict[i]['info']['tracking_mask'], tracking_mask.unsqueeze(1)[i:i+1]], dim=1)
+
 
                     
                         done_envs = 0
@@ -340,13 +323,12 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
                             done_envs += dump_dict[i]['done']
                     
                         if done_envs == all_num_envs:
-                            motion_export_path = self.task.cfg['env']['export_motion_path']
+                            motion_export_path = self.task.cfg['env'].get('motion_export_path', 'motion_export')
+                            os.makedirs(f'{motion_export_path}', exist_ok=True)
                             for i in range(all_num_envs):
                                 for key in dump_dict[i]['info'].keys():
                                     dump_dict[i]['info'][key] = dump_dict[i]['info'][key].detach().cpu().numpy()
                                 motion_export = dump_dict[i]['info']
-                                motion_export = self._post_process_dump_data(i, motion_export)
-                                os.makedirs(f'{motion_export_path}', exist_ok=True)
                                 length = motion_export["root_pos_all"].shape[1]
                                 print(f'Dump to: {motion_export_path}/{i}.pkl. Motion length: {length}.')
                                 joblib.dump(motion_export, f'{motion_export_path}/{i}.pkl')
@@ -396,33 +378,3 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
         return
 
 
-    def _post_process_dump_data(self, idx, motion_dump):
-        skeleton_tree = self.task.skeleton_trees[idx]
-        offset = skeleton_tree.local_translation[0]
-        root_pos = motion_dump['root_pos_all'][0]
-        root_rot = motion_dump['root_rot_all'][0]
-        body_pos = motion_dump['dof_pos_all'][0]
-        pose_aa = np.concatenate([root_rot[:, None, :], body_pos], axis=1)
-        batch_size = pose_aa.shape[0]
-        pose_quat = sRot.from_rotvec(pose_aa.reshape(-1, 3)).as_quat().reshape(batch_size, 24, 4)[..., self.task.smpl_2_mujoco, :]
-        root_trans_offset = root_pos - offset.numpy()
-        sk_state = SkeletonState.from_rotation_and_root_translation(
-            skeleton_tree,
-            torch.from_numpy(pose_quat),
-            torch.from_numpy(root_pos),
-            is_local=True)
-        global_rot = sk_state.global_rotation
-        B, J, N = global_rot.shape
-        pose_quat_global = (sRot.from_quat(global_rot.reshape(-1, 4).numpy()) * sRot.from_quat([0.5, 0.5, 0.5, 0.5])).as_quat().reshape(B, -1, 4)
-        B_down = pose_quat_global.shape[0]
-        new_sk_state = SkeletonState.from_rotation_and_root_translation(
-            skeleton_tree,
-            torch.from_numpy(pose_quat_global),
-            torch.from_numpy(root_pos),
-            is_local=False)
-        local_rot = new_sk_state.local_rotation
-        pose_aa = sRot.from_quat(local_rot.reshape(-1, 4).numpy()).as_rotvec().reshape(B_down, -1, 3)
-        pose_aa = pose_aa[:, self.task.mujoco_2_smpl, :]
-        motion_dump['root_rot_all'] = pose_aa[:, 0][None, ...]
-        motion_dump['dof_pos_all'] = pose_aa[:, 1:][None, ...]
-        return motion_dump

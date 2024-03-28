@@ -309,20 +309,20 @@ class HumanoidPedestrianIm(humanoid_traj.HumanoidTraj):
         self.d3_visible[env_ids] = d3_visible
 
         ########### update for visualization
-        if flags.test:  
+        # if flags.test:  
             # rotate
-            ref_heading_rot, heading = torch_utils.calc_heading_quat_inv_with_heading(ref_root_rot)
-            B, J, _ = body_pos.shape
-            ref_body_pos = ref_rb_pos.clone()
-            ref_body_pos = ref_body_pos.reshape(-1, 3)
-            # rot = torch.tensor([ 0, 0, -0.7071068, 0.7071068 ], device=self.device, dtype=torch.float32)[None, None, :]
-            # ref_body_pos = torch_utils.my_quat_rotate(rot.repeat(1, J, 1).reshape(-1, 4), ref_body_pos)
-            ref_body_pos = torch_utils.my_quat_rotate(ref_heading_rot[:, None, :].repeat(1, J, 1).reshape(-1, 4), ref_body_pos)
-            heading = torch_utils.calc_heading_quat(root_rot)
-            ref_body_pos = torch_utils.my_quat_rotate(heading[:, None, :].repeat(1, J, 1).reshape(-1, 4), ref_body_pos)
-            ref_body_pos = ref_body_pos.reshape(B, -1, 3)
-            self.im_ref_rb_target_pos[env_ids] = ref_body_pos.clone()
-            self.im_ref_rb_target_pos[:, 0] *= -1
+            # ref_heading_rot, heading = torch_utils.calc_heading_quat_inv_with_heading(ref_root_rot)
+            # B, J, _ = body_pos.shape
+            # ref_body_pos = ref_rb_pos.clone()
+            # ref_body_pos = ref_body_pos.reshape(-1, 3)
+            # # rot = torch.tensor([ 0, 0, -0.7071068, 0.7071068 ], device=self.device, dtype=torch.float32)[None, None, :]
+            # # ref_body_pos = torch_utils.my_quat_rotate(rot.repeat(1, J, 1).reshape(-1, 4), ref_body_pos)
+            # ref_body_pos = torch_utils.my_quat_rotate(ref_heading_rot[:, None, :].repeat(1, J, 1).reshape(-1, 4), ref_body_pos)
+            # heading = torch_utils.calc_heading_quat(root_rot)
+            # ref_body_pos = torch_utils.my_quat_rotate(heading[:, None, :].repeat(1, J, 1).reshape(-1, 4), ref_body_pos)
+            # ref_body_pos = ref_body_pos.reshape(B, -1, 3)
+            # self.im_ref_rb_target_pos[env_ids] = ref_body_pos.clone()
+            # self.im_ref_rb_target_pos[:, 0] *= -1
         return obs
 
 
@@ -417,7 +417,7 @@ class HumanoidPedestrianIm(humanoid_traj.HumanoidTraj):
             self._enable_early_termination, flags.no_collision_check,
             self.terminate_dist[0], self.use_imitation_reset)
         return
-    
+
 
 #####################################################################
 ###=========================jit functions=========================###

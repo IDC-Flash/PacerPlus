@@ -376,7 +376,9 @@ class HumanoidAMP(Humanoid):
             x_grid, y_grid = torch.meshgrid(torch.arange(64), torch.arange(64))
             root_pos[:, 0], root_pos[:, 1] = x_grid.flatten()[env_ids] * 2, y_grid.flatten()[env_ids] * 2
 
-        root_pos[:, 2] += 1.1
+        root_pos[:, 2] += 1.0
+        if flags.test:
+            root_pos[: , :2] = torch.tensor(self.real_traj[:1, :2]).to(self.device).float()
         # if flags.test:
         #     dof_pos = self.default_dof_pos
 
@@ -550,7 +552,8 @@ class HumanoidAMP(Humanoid):
 
         return
 
-
+    def get_current_pose(self):
+        return self._base_pos.cpu(), self._base_quat.cpu(), self.dof_pos.cpu()
 
 #####################################################################
 ###=========================jit functions=========================###
