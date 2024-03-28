@@ -3,7 +3,7 @@ notes:  "Capsual Model, rotation amp observation, large data, big ankle, Terrain
 project_name: "crossroad_smpl"
 env:
   motion_file: data/h1_data/run_train
-  imitation_motion_file: data/h1_data/h1_full_train
+  imitation_motion_file: data/h1_data/h1_cmu_kit_train
 
   terrain_obs: True
   terrain_obs_type: "square_fov"
