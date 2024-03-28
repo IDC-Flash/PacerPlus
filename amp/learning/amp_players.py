@@ -327,7 +327,8 @@ class AMPPlayerContinuous(common_player.CommonPlayer):
                             os.makedirs(f'{motion_export_path}', exist_ok=True)
                             for i in range(all_num_envs):
                                 for key in dump_dict[i]['info'].keys():
-                                    dump_dict[i]['info'][key] = dump_dict[i]['info'][key].detach().cpu().numpy()
+                                    traj_length = self.task.traj_length
+                                    dump_dict[i]['info'][key] = dump_dict[i]['info'][key][:traj_length[i]].detach().cpu().numpy()
                                 motion_export = dump_dict[i]['info']
                                 length = motion_export["root_pos_all"].shape[1]
                                 print(f'Dump to: {motion_export_path}/{i}.pkl. Motion length: {length}.')

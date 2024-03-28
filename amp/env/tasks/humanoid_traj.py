@@ -7,6 +7,7 @@
 
 import torch
 import json
+import joblib
 import env.tasks.humanoid_amp_task as humanoid_amp_task
 import env.util.traj_generator as traj_generator
 
@@ -107,13 +108,16 @@ class HumanoidTraj(humanoid_amp_task.HumanoidAMPTask):
         return
 
     def _load_real_traj(self, real_traj_path):
-        real_traj_path = '/home/admin1/workspace/idc-flash/pacerplus/trajectory.json'
-        with open(real_traj_path, 'r') as f:
-            path = json.load(f)
+        data = joblib.load(real_traj_path)
+        if isinstance(data, dict):
+            path = data['traj']
+            length = data['length']
+            path = np.concatenate([path, np.zeros_like(path[:, :, 0:1])], axis=2)
+            self.traj_length = np.array(length)
+        else:
+            path = np.concatenate([data, np.zeros_like(data[:, :, 0:1])], axis=2)
+            self.traj_length = np.array([data.shape[1]] * data.shape[0])
 
-        path_xy = np.array(path)
-        path = np.zeros((path_xy.shape[0],3))
-        path[:, :2] = path_xy
         return path
     
     def _build_traj_generator(self):
@@ -167,12 +171,24 @@ class HumanoidTraj(humanoid_amp_task.HumanoidAMPTask):
         if flags.fixed:
             x_grid, y_grid = torch.meshgrid(torch.arange(64), torch.arange(64))
             root_pos[:, 0], root_pos[:, 1] = x_grid.flatten()[env_ids] * 2, y_grid.flatten()[env_ids] * 2
+        root_pos[:, 2] += 1.05
 
-        root_pos[:, 2] += 1.1
-        if self.realTrajPath is not None:
-            root_pos[: , :2] = torch.tensor(self.real_traj[:1, :2]).to(self.device).float()
-        # if flags.test:
-        #     dof_pos = self.default_dof_pos
+        if flags.test:
+            if self.realTrajPath is not None:
+                root_pos[: , :2] = torch.tensor(self.real_traj[:, 0, :2]).to(self.device).float()[env_ids]
+                direction = torch.tensor(self.real_traj[:, 1, :2]).to(self.device).float()[env_ids] - torch.tensor(self.real_traj[:, 0, :2]).to(self.device).float()[env_ids]
+            else:
+                direction = self._traj_gen._verts[:, 1, :2] - self._traj_gen._verts[:, 0, :2]
+
+            angle = torch.atan2(direction[:, 1], direction[:, 0])
+            root_rot[:, 0] = 0
+            root_rot[:, 1] = 0
+            root_rot[:, 2] = torch.sin(angle / 2)
+            root_rot[:, 3] = torch.cos(angle / 2)
+            root_vel = torch.zeros_like(root_vel)
+            root_ang_vel = torch.zeros_like(root_ang_vel)
+            dof_vel = torch.zeros_like(dof_vel)
+
 
         self._set_env_state(env_ids=env_ids,
                             root_pos=root_pos,

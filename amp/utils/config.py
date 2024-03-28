@@ -85,6 +85,8 @@ def load_cfg(args):
     if args.episode_length > 0:
         cfg["env"]["episodeLength"] = args.episode_length
 
+    if args.real_traj is not None:
+        cfg["env"]["realTrajPath"] = args.real_traj
 
     cfg["name"] = args.task
     cfg["headless"] = args.headless
@@ -471,6 +473,11 @@ def get_args(benchmark=False):
             "name": "--show_im",
             "action": "store_true",
             "default": False
+        },
+        {
+            "name": "--real_traj",
+            "type": str,
+            "default": None,
         }
     ]
 

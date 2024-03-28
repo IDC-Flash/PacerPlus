@@ -242,16 +242,7 @@ class HumanoidPedestrianIm(humanoid_traj.HumanoidTraj):
             self.d3_visible[env_ids] = d3_visible
             self.target_dof[env_ids] = dof_pos.clone()
 
-    # def pre_physics_step(self, actions):
-    #     #### Hz < 500 use PD control rather than torque control
-    #     pd_tar = self._pd_action_offset + self._pd_action_scale * actions 
-    #     pd_tar = torch.clamp(pd_tar, self.dof_pos_limits[:, 0], self.dof_pos_limits[:, 1])
-    #     if self.d3_visible.sum() > 0:
-    #         pd_tar[self.d3_visible==1, self._dof_track_bodies_id] = self.target_dof[self.d3_visible==1, self._dof_track_bodies_id]
 
-    #     pd_tar_tensor = gymtorch.unwrap_tensor(pd_tar)
-    #     self.gym.set_dof_position_target_tensor(self.sim, pd_tar_tensor)
-    #     return
 
     def _compute_task_obs(self, env_ids=None):
         # Compute task observations (terrain, trajectory, self state)
@@ -309,20 +300,19 @@ class HumanoidPedestrianIm(humanoid_traj.HumanoidTraj):
         self.d3_visible[env_ids] = d3_visible
 
         ########### update for visualization
-        # if flags.test:  
-            # rotate
-            # ref_heading_rot, heading = torch_utils.calc_heading_quat_inv_with_heading(ref_root_rot)
-            # B, J, _ = body_pos.shape
-            # ref_body_pos = ref_rb_pos.clone()
-            # ref_body_pos = ref_body_pos.reshape(-1, 3)
-            # # rot = torch.tensor([ 0, 0, -0.7071068, 0.7071068 ], device=self.device, dtype=torch.float32)[None, None, :]
-            # # ref_body_pos = torch_utils.my_quat_rotate(rot.repeat(1, J, 1).reshape(-1, 4), ref_body_pos)
-            # ref_body_pos = torch_utils.my_quat_rotate(ref_heading_rot[:, None, :].repeat(1, J, 1).reshape(-1, 4), ref_body_pos)
-            # heading = torch_utils.calc_heading_quat(root_rot)
-            # ref_body_pos = torch_utils.my_quat_rotate(heading[:, None, :].repeat(1, J, 1).reshape(-1, 4), ref_body_pos)
-            # ref_body_pos = ref_body_pos.reshape(B, -1, 3)
-            # self.im_ref_rb_target_pos[env_ids] = ref_body_pos.clone()
-            # self.im_ref_rb_target_pos[:, 0] *= -1
+        if flags.test:  
+            ref_heading_rot, heading = torch_utils.calc_heading_quat_inv_with_heading(ref_root_rot)
+            B, J, _ = body_pos.shape
+            ref_body_pos = ref_rb_pos.clone()
+            ref_body_pos = ref_body_pos.reshape(-1, 3)
+            # rot = torch.tensor([ 0, 0, -0.7071068, 0.7071068 ], device=self.device, dtype=torch.float32)[None, None, :]
+            # ref_body_pos = torch_utils.my_quat_rotate(rot.repeat(1, J, 1).reshape(-1, 4), ref_body_pos)
+            ref_body_pos = torch_utils.my_quat_rotate(ref_heading_rot[:, None, :].repeat(1, J, 1).reshape(-1, 4), ref_body_pos)
+            heading = torch_utils.calc_heading_quat(root_rot)
+            ref_body_pos = torch_utils.my_quat_rotate(heading[:, None, :].repeat(1, J, 1).reshape(-1, 4), ref_body_pos)
+            ref_body_pos = ref_body_pos.reshape(B, -1, 3)
+            self.im_ref_rb_target_pos[env_ids] = ref_body_pos.clone()
+            self.im_ref_rb_target_pos[:, 0] *= -1
         return obs
 
 
