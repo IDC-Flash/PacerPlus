@@ -1,6 +1,7 @@
 from rl_games.algos_torch import torch_ext
 from rl_games.algos_torch import layers
-from rl_games.algos_torch import network_builder
+#from rl_games.algos_torch import network_builder
+from amp.learning import network_builder
 
 import torch
 import torch.nn as nn
