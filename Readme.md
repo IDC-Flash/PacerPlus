@@ -1,7 +1,7 @@
 # PACER+: On-Demand Pedestrian Animation Controller in Driving Scenarios
-Official implementation of the paper "PACER+: On-Demand Pedestrian Animation Controller in Driving Scenarios" (CVPR 2024). 
+Official implementation of the paper "PACER+: On-Demand Pedestrian Animation Controller in Driving Scenarios" (CVPR 2024) for Unitree h1 Robot. 
     
-We address the challenge of content diversity and controllability in pedestrian simulation for driving scenarios. The fundamental contribution of our framework lies in combining the motion tracking task with trajectory following, which enables the tracking of specific motion parts (eg., upper body) while simultaneously following the given trajectory by a single policy. This way, we enhance both the diversity of simulated human motion within the given scenario and the controllability of the content, including language-based control. Our framework facilitates the generation of a wide range of human motions, contributing to greater realism and adaptability in pedestrian simulations for driving scenarios.
+
 
 <div float="center">
   <img src="assets/teaser.gif" />
@@ -20,10 +20,10 @@ We address the challenge of content diversity and controllability in pedestrian 
 
 # Todos
 
-- []  Release dataset tools for different humanoid agents.
 - []  Release the inference environment and our web interface.
-- []  Release my checkpoints.
 - []  Release the training code for CNN model.
+- [x]  Release my checkpoints.
+- [x]  Release the modified version for Unitree H1 Robot in uniree_h1 branch.
 - [x] Release an example city environment.
 - [x] Release the training code for basic model.
 
@@ -65,18 +65,34 @@ pip install -r requirement.txt
 ```
 5. City Environment: We have an example environment for the virtual city environment. This environment is built on top of the [Matrix City](https://city-super.github.io/matrixcity/). You can download the environment from [here](https://drive.google.com/file/d/1koj-EqLrnivLVwmuRFydWZQgUGavmWYS/view?usp=drive_link).
 
+6. Checkpoint: The checkpoint for MLP policy is at [Google Drive](https://drive.google.com/file/d/1C5KrWhpnt5AGUNziymjvfmSxt9PPHnoR/view?usp=drive_link). You can download the checkpoint and put it in the `output` folder. The file structure should look like this:
+
+```
+| -- output
+    | -- mlp_slim_exp_v2
+        | -- Humanoid.pth
+
+```
+
 # Training
 We train our policy on a single A100 GPU. We do not use Residual Force Control (RFC) and Residual PD for this work. We test our code on A100, RTX 3090 and RTX 4090. The training time is almost 3 days for our experiments.
 
     export OMP_NUM_THREADS=1
-    python -u  amp/run.py --task HumanoidPedestrianTerrainIm --cfg_env amp/data/cfg/release/mlp_slim_exp_v1.yaml --network_path output/mlp_slim_exp_v1 --headless --num_envs 4096 --num_threads 4
+    python -u  amp/run.py --task HumanoidPedestrianTerrainIm --cfg_env amp/data/cfg/release/mlp_slim_exp_v2.yaml --network_path output/mlp_slim_exp_v2 --headless --num_envs 2048 --num_threads 4
+
+# Inference 
+
+You can infer this policy through the following command:
+      
+    export OMP_NUM_THREADS=1
+    python -u  amp/run.py --task HumanoidPedestrianTerrainIm --cfg_env amp/data/cfg/release/mlp_slim_exp_v2.yaml --network_path output/mlp_slim_exp_v2 --rl_device cuda:0 --num_envs 1  --test --follow --epoch -1
 
 
 # Citation
 If you find this work useful for your research, please cite our paper:
 ```
 @inproceedings{Wang2024PacerPlus,
-    author={Jingbo Wang and Zhengyi Luo and Yixuan Li and Ye Yuan and Bo Dai},
+    author={Jingbo Wang and Zhengyi Luo and Ye Yuan and Yixuan Li and Bo Dai},
     title={PACER+: On-Demand Pedestrian Animation Controller in Driving Scenarios},
     booktitle={Conference on Computer Vision and Pattern Recognition (CVPR)},
     year={2024}
