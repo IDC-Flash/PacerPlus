@@ -246,7 +246,7 @@ class MotionLib():
         print("Sampling motion:", sample_idxes[:10])
 
         motion_data_list = self._motion_data_list[sample_idxes.cpu().numpy()]
-        #mp.set_sharing_strategy('file_descriptor')
+        mp.set_sharing_strategy('file_system')
 
         manager = mp.Manager()
         queue = manager.Queue()

@@ -692,6 +692,8 @@ class Humanoid(BaseTask):
                 "master_range": self._master_range,
                 "big_ankle": self.big_ankle,
                 "model": "smpl",
+                "freeze_hand": False,
+                "box_body": True,
                 "body_params": {},
                 "joint_params": {},
                 "geom_params": {},

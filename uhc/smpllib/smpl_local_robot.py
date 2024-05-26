@@ -1155,7 +1155,9 @@ class Robot:
         if self.upright_start:
             print("!!!! Using modified SMPL starting pose !!!!")
         self.remove_toe = cfg.get("remove_toe", False)
+        self.freeze_hand = cfg.get("freeze_hand", True)
         self.big_ankle = cfg.get("big_ankle", False)
+        self.box_body = cfg.get("box_body", False)
         self.real_weight = cfg.get("real_weight", False)
         self.real_weight_porpotion = cfg.get("real_weight_porpotion", False)
         self.rel_joint_lm = cfg.get("rel_joint_lm",
@@ -1434,6 +1436,8 @@ class Robot:
                                             channels, {},
                                             upright_start=self.upright_start,
                                             remove_toe=self.remove_toe,
+                                            freeze_hand = self.freeze_hand, 
+                                            box_body = self.box_body, 
                                             big_ankle=self.big_ankle,
                                             real_weight_porpotion=self.real_weight_porpotion,
                                             real_weight = self.real_weight)

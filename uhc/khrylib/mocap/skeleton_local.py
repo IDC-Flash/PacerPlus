@@ -181,7 +181,9 @@ class Skeleton:
         spec_channels=None,
         upright_start=False,
         remove_toe=False,
+        freeze_hand= False,
         real_weight_porpotion=False,
+        box_body = False, 
         real_weight=False,
         big_ankle =  False,
     ):
@@ -197,6 +199,8 @@ class Skeleton:
         self.real_weight_porpotion = real_weight_porpotion
         self.real_weight = real_weight
         self.big_ankle = big_ankle
+        self.freeze_hand = freeze_hand
+        self.box_body = box_body
         joint_names = list(
             filter(lambda x: all([t not in x for t in exclude_bones]),
                    offsets.keys()))
@@ -331,7 +335,7 @@ class Skeleton:
                 j_attr["axis"] = "{0:.4f} {1:.4f} {2:.4f}".format(*axis)
                 j_attr["stiffness"] = str(GAINS[bone.name][0]  )
                 j_attr["damping"] = str(GAINS[bone.name][1])
-                j_attr["armature"] = "0.02"
+                j_attr["armature"] = "0.01"
 
                 if i < len(bone.lb):
                     j_attr["range"] = "{0:.4f} {1:.4f}".format(
@@ -348,6 +352,15 @@ class Skeleton:
         g_attr["type"] = GEOM_TYPES[bone.name]
         g_attr["contype"] = "1"
         g_attr["conaffinity"] = "1"
+
+        if not self.freeze_hand:
+            GEOM_TYPES['L_Hand'] = 'box'
+            GEOM_TYPES['R_Hand'] = 'box'
+        
+        if self.box_body:
+            GEOM_TYPES['Head'] = 'box'
+            GEOM_TYPES['Pelvis'] = 'box'
+
         if self.real_weight:
             base_density = 1000
         else:
@@ -460,7 +473,17 @@ class Skeleton:
                 g_attr["size"] = "{0:.4f} {1:.4f} {2:.4f}".format(*size)
                 g_attr["quat"] = "{0:.4f} {1:.4f} {2:.4f} {3:.4f}".format(*rot)
 
+            if bone.name == "Pelvis":
+                size /= 1.95  # ZL Hack: shrinkage
+                #pos[2] += 0.03
 
+            if bone.name == "Head":
+                if self.upright_start:
+                    size[0] /= 1.5  # ZL Hack: shrinkage
+                    size[1] /= 1.5  # ZL Hack: shrinkage
+                else:
+                    size[0] /= 1.5  # ZL Hack: shrinkage
+                    size[2] /= 1.5  # ZL Hack: shrinkage
 
             if self.real_weight_porpotion:
                 g_attr["density"] = str((hull_params['volume'] / (size[0] * size[1] * size[2] * 8)) * base_density)
