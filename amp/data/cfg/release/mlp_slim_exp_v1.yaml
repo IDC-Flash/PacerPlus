@@ -161,8 +161,8 @@ params:
         learn_sigma: False
 
     mlp:
-      units: [1024, 512]
-      activation: relu
+      units: [2048, 1024, 512]
+      activation: selu
       d2rl: False
       
       initializer:
