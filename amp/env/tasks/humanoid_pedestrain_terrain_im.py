@@ -34,6 +34,7 @@ HACK_MOTION_SYNC = False
 
 class HumanoidPedestrianTerrainIm(humanoid_pedestrain_terrain.HumanoidPedestrianTerrain):
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
+        self.real_mesh = cfg['args'].real_mesh
         self._full_body_reward = cfg["env"].get("full_body_reward", True)
         self._min_motion_len = cfg["env"].get("min_length", -1)
         self.use_different_motion_file = cfg["env"].get("use_different_motion_file", True)
@@ -44,6 +45,9 @@ class HumanoidPedestrianTerrainIm(humanoid_pedestrain_terrain.HumanoidPedestrian
         self.has_tracking_mask_obs = cfg["env"].get("has_tracking_mask_obs", False) and self.has_tracking_mask
         if not cfg['args'].headless:
             self._infilling_handles = [[] for _ in range(cfg['args'].num_envs)]
+
+        if self.real_mesh:
+            self.terrain_path = cfg['env']['real_terrain']['terrain_path']
 
         super().__init__(cfg, sim_params, physics_engine, device_type, device_id, headless)
         self._track_bodies = cfg["env"].get("trackBodies", self._full_track_bodies)
@@ -109,12 +113,16 @@ class HumanoidPedestrianTerrainIm(humanoid_pedestrain_terrain.HumanoidPedestrian
     def build_body_tracking_mask(self, env_ids):
         ### build tracking_mask
         if self.has_tracking_mask:
-            tracking_mask = torch.zeros((env_ids.shape[0], self.num_bodies), dtype=torch.int, device=self.device)
-            selecte_num = torch.randint(self.num_bodies//2, self.num_bodies, (1,)).item()
-            selected_idx = torch.randperm(self.num_bodies)[:selecte_num].to(self.device)
-            tracking_mask[:, selected_idx] = 1
-            tracking_mask[:, 0] = 1
-            self.tracking_mask = tracking_mask.unsqueeze(-1)
+            # tracking_mask = torch.zeros((env_ids.shape[0], self.num_bodies), dtype=torch.int, device=self.device)
+            # selecte_num = torch.randint(self.num_bodies//2, self.num_bodies, (1,)).item()
+            # selected_idx = torch.randperm(self.num_bodies)[:selecte_num].to(self.device)
+            # tracking_mask[:, selected_idx] = 1
+            # tracking_mask[:, 0] = 1
+            # self.tracking_mask = tracking_mask.unsqueeze(-1)
+            self._upper_track_bodies_id = self._build_key_body_ids_tensor(self._upper_track_bodies)
+            self.tracking_mask = torch.zeros((env_ids.shape[0], self.num_bodies, 1), device=self.device, dtype=torch.int)
+            self.tracking_mask[:, self._upper_track_bodies_id] = 1
+            self.tracking_mask[:, 0] = 1
         else:
             self.tracking_mask = torch.ones((env_ids.shape[0], self.num_bodies, 1), dtype=torch.int, device=self.device)
 
